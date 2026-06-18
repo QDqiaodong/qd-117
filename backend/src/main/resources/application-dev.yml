@@ -1,0 +1,45 @@
+server:
+  port: 8088
+  address: 127.0.0.1
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: small-parts-inventory
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3309/inventory_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    username: inventory
+    password: InventoryPass_2026!
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6380
+      database: 0
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.inventory.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+logging:
+  level:
+    com.inventory: DEBUG
+  file:
+    name: logs/application.log

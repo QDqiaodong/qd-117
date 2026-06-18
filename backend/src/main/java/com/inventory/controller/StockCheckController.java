@@ -1,0 +1,36 @@
+package com.inventory.controller;
+
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.inventory.common.Result;
+import com.inventory.dto.StockCheckDTO;
+import com.inventory.entity.StockCheckRecord;
+import com.inventory.service.StockCheckService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/stock-check")
+@RequiredArgsConstructor
+public class StockCheckController {
+
+    private final StockCheckService stockCheckService;
+
+    @GetMapping("/page")
+    public Result<IPage<StockCheckRecord>> getPageList(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "10") Integer pageSize,
+            @RequestParam(required = false) String partModel,
+            @RequestParam(required = false) String quarter,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false) String endTime) {
+        return Result.success(stockCheckService.getPageList(pageNum, pageSize, partModel, quarter, startTime, endTime));
+    }
+
+    @PostMapping
+    public Result<List<StockCheckRecord>> checkStock(@Valid @RequestBody StockCheckDTO dto) {
+        return Result.success("盘点记录保存成功", stockCheckService.checkStock(dto));
+    }
+}

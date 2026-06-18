@@ -1,0 +1,52 @@
+import { createRouter, createWebHashHistory } from 'vue-router'
+
+const routes = [
+  {
+    path: '/',
+    name: 'Dashboard',
+    component: () => import('@/views/Dashboard.vue'),
+    meta: { title: '库存总览' }
+  },
+  {
+    path: '/stock-in',
+    name: 'StockIn',
+    component: () => import('@/views/StockIn.vue'),
+    meta: { title: '小件入库建档' }
+  },
+  {
+    path: '/stock-out',
+    name: 'StockOut',
+    component: () => import('@/views/StockOut.vue'),
+    meta: { title: '产线领用出库' }
+  },
+  {
+    path: '/stock-check',
+    name: 'StockCheck',
+    component: () => import('@/views/StockCheck.vue'),
+    meta: { title: '季度库存清点' }
+  },
+  {
+    path: '/scrap',
+    name: 'Scrap',
+    component: () => import('@/views/Scrap.vue'),
+    meta: { title: '破损零件报废' }
+  },
+  {
+    path: '/records',
+    name: 'Records',
+    component: () => import('@/views/Records.vue'),
+    meta: { title: '流水记录查询' }
+  }
+]
+
+const router = createRouter({
+  history: createWebHashHistory(),
+  routes
+})
+
+router.beforeEach((to, from, next) => {
+  document.title = to.meta.title ? `${to.meta.title} - 组装机顶针小件库存登记系统` : '组装机顶针小件库存登记系统'
+  next()
+})
+
+export default router

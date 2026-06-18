@@ -1,0 +1,70 @@
+# ==============================================================
+# 后端 Docker 构建上下文排除文件
+# 禁止把本地编译产物、日志、IDE 配置、临时文件打入镜像
+# ==============================================================
+
+# --- Maven 编译产物 ---
+target
+build
+*.jar
+*.war
+*.ear
+
+# --- Maven 本地仓库缓存(容器内单独管理) ---
+.m2/repository
+
+# --- 日志文件 ---
+logs
+*.log
+
+# --- IDE / 编辑器 ---
+.idea
+.vscode
+*.iml
+*.iws
+*.ipr
+.project
+.classpath
+.settings
+.factorypath
+.apt_generated
+.springBeans
+.sts4-cache
+*.swp
+*.swo
+*~
+
+# --- 操作系统 ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- 临时 / 缓存 ---
+*.tmp
+*.temp
+.cache
+
+# --- 测试 ---
+target/test-classes
+target/surefire-reports
+target/failsafe-reports
+.gradle
+build
+
+# --- 文档 ---
+*.md
+!README.md
+docs/
+HELP.md
+
+# --- 环境变量 ---
+.env
+.env.local
+
+# --- 其他 ---
+Dockerfile
+Dockerfile.*
+docker-compose*.yml
+*.sh
+out

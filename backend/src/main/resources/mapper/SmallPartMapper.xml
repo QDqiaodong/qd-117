@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.inventory.mapper.SmallPartMapper">
+
+    <resultMap id="BaseResultMap" type="com.inventory.entity.SmallPart">
+        <id column="id" property="id"/>
+        <result column="part_model" property="partModel"/>
+        <result column="part_name" property="partName"/>
+        <result column="part_type" property="partType"/>
+        <result column="spec_params" property="specParams"/>
+        <result column="shelf_no" property="shelfNo"/>
+        <result column="stock_quantity" property="stockQuantity"/>
+        <result column="unit" property="unit"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        SELECT * FROM small_part
+        <where>
+            <if test="partType != null and partType != ''">
+                AND part_type = #{partType}
+            </if>
+            <if test="keyword != null and keyword != ''">
+                AND (part_model LIKE CONCAT('%', #{keyword}, '%')
+                OR part_name LIKE CONCAT('%', #{keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

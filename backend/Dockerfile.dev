@@ -1,0 +1,37 @@
+# ============================================================
+# 后端 Dockerfile（开发环境）
+# 核心策略：依赖层与源码层严格分层，仅 Docker 原生分层缓存，无任何额外语法
+# ============================================================
+
+# ---------- 构建阶段 ----------
+ARG DOCKER_REGISTRY
+FROM ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-17-alpine AS build
+
+WORKDIR /app
+
+# ------ 第1层：仅复制 Maven 配置 + pom.xml，不变更则不触发重下载 ------
+COPY settings.xml /root/.m2/settings.xml
+COPY pom.xml ./
+
+# 预下载全部依赖（pom.xml 不变则缓存命中）
+RUN mvn dependency:go-offline -B -q
+
+# ------ 第2层：仅复制源码，代码变更只触发编译不触发依赖下载 ------
+COPY src ./src
+
+RUN mvn clean package -DskipTests -B -q
+
+# ---------- 运行阶段 ----------
+ARG DOCKER_REGISTRY
+FROM ${DOCKER_REGISTRY}eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+COPY --from=build /app/target/small-parts-inventory.jar app.jar
+
+EXPOSE 8088
+
+ENTRYPOINT ["java", "-jar", "-Xms512m", "-Xmx1024m", "app.jar"]

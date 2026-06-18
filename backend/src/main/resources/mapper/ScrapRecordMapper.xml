@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.inventory.mapper.ScrapRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.inventory.entity.ScrapRecord">
+        <id column="id" property="id"/>
+        <result column="part_id" property="partId"/>
+        <result column="part_model" property="partModel"/>
+        <result column="quantity" property="quantity"/>
+        <result column="scrap_reason" property="scrapReason"/>
+        <result column="operator" property="operator"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        SELECT * FROM scrap_record
+        <where>
+            <if test="partModel != null and partModel != ''">
+                AND part_model LIKE CONCAT('%', #{partModel}, '%')
+            </if>
+            <if test="scrapReason != null and scrapReason != ''">
+                AND scrap_reason = #{scrapReason}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND create_time >= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND create_time <= #{endTime}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>

@@ -1,0 +1,47 @@
+# ============================================================
+# 前端 Dockerfile（生产环境）
+# 核心策略：依赖层与源码层严格分层，仅 Docker 原生分层缓存，无任何额外语法
+# 生产环境使用 npm ci 严格按 lockfile 安装，保证构建可复现
+# ============================================================
+
+# ---------- 构建阶段 ----------
+ARG DOCKER_REGISTRY
+FROM ${DOCKER_REGISTRY}node:20-alpine AS build
+
+WORKDIR /app
+
+# 设置国内 npm 镜像源（中科大），无需 VPN
+RUN npm config set registry https://mirrors.ustc.edu.cn/npm/ \
+    && npm config set disturl https://mirrors.ustc.edu.cn/node/
+
+# ------ 第1层：仅复制依赖清单，内容不变更则不触发重下载 ------
+# 生产环境 package-lock.json 优先（若存在则走 npm ci 严格模式）
+COPY package.json package-lock.json* ./
+
+# 如果存在 lockfile 则用 npm ci，否则 npm install
+RUN if [ -f package-lock.json ]; then \
+      echo ">>> Found package-lock.json, using npm ci for deterministic install"; \
+      npm ci --no-audit --no-fund; \
+    else \
+      echo ">>> No package-lock.json, fallback to npm install"; \
+      npm install --no-audit --no-fund; \
+    fi
+
+# ------ 第2层：复制源代码，仅业务代码变更时只重跑 build 不重下依赖 ------
+COPY . .
+
+RUN npm run build
+
+# ---------- 运行阶段 ----------
+ARG DOCKER_REGISTRY
+FROM ${DOCKER_REGISTRY}nginx:alpine
+
+ENV TZ=Asia/Shanghai
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
