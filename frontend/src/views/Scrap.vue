@@ -131,7 +131,7 @@ const columns = reactive([
     minWidth: 260,
     options: []
   },
-  { prop: 'quantity', label: '报废数量', type: 'number', min: 1, width: 120 },
+  { prop: 'quantity', label: '报废数量', type: 'number', min: 0, width: 120 },
   {
     prop: 'scrapReason',
     label: '报废原因',

@@ -145,7 +145,7 @@ const columns = reactive([
     minWidth: 200,
     options: []
   },
-  { prop: 'quantity', label: '领用数量', type: 'number', min: 1, width: 120 }
+  { prop: 'quantity', label: '领用数量', type: 'number', min: 0, width: 120 }
 ])
 
 const validators = {

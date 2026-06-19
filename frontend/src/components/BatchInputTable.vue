@@ -93,6 +93,10 @@
 import { ref, watch, computed, reactive } from 'vue'
 
 const props = defineProps({
+  modelValue: {
+    type: Array,
+    default: () => []
+  },
   columns: {
     type: Array,
     required: true
@@ -123,7 +127,14 @@ const createEmptyRow = () => {
   return row
 }
 
-const tableData = ref(props.initialData.length > 0 ? [...props.initialData] : [createEmptyRow()])
+const initTableData = () => {
+  const source = props.modelValue && props.modelValue.length > 0
+    ? props.modelValue
+    : (props.initialData && props.initialData.length > 0 ? props.initialData : null)
+  return source ? [...source] : [createEmptyRow()]
+}
+
+const tableData = ref(initTableData())
 
 const addRow = () => {
   tableData.value.push(createEmptyRow())
@@ -254,6 +265,17 @@ const rowClassName = ({ rowIndex }) => {
 watch(tableData, (val) => {
   emit('update:modelValue', val)
 }, { deep: true })
+
+watch(() => props.modelValue, (newVal) => {
+  if (newVal === tableData.value) return
+  if (newVal && newVal.length > 0) {
+    tableData.value = newVal.map(row => ({ ...row }))
+  } else {
+    tableData.value = [createEmptyRow()]
+  }
+  Object.keys(rowErrors).forEach(key => delete rowErrors[key])
+  emitValidationChange()
+})
 
 defineExpose({
   validate: validateAll,
