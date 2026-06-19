@@ -13,9 +13,11 @@
     </el-form>
 
     <BatchInputTable
+      ref="batchTableRef"
       v-model="form.items"
       :columns="columns"
       :initial-data="form.items"
+      :validators="validators"
       @change="onItemsChange"
     />
 
@@ -104,6 +106,8 @@ const recordPage = reactive({
   pageSize: 10
 })
 
+const batchTableRef = ref(null)
+
 const columns = [
   { prop: 'partModel', label: '零件型号', placeholder: '必填', minWidth: 140 },
   { prop: 'partName', label: '零件名称', placeholder: '可选', minWidth: 140 },
@@ -124,6 +128,33 @@ const columns = [
   { prop: 'remark', label: '备注', placeholder: '可选', minWidth: 150 }
 ]
 
+const validators = {
+  partModel: (value) => {
+    if (!value || value.trim() === '') {
+      return { valid: false, message: '型号不能为空' }
+    }
+    return { valid: true }
+  },
+  partType: (value) => {
+    if (!value) {
+      return { valid: false, message: '请选择零件类型' }
+    }
+    return { valid: true }
+  },
+  shelfNo: (value) => {
+    if (!value || value.trim() === '') {
+      return { valid: false, message: '货架编号不能为空' }
+    }
+    return { valid: true }
+  },
+  quantity: (value) => {
+    if (value === null || value === undefined || value <= 0) {
+      return { valid: false, message: '数量必须大于0' }
+    }
+    return { valid: true }
+  }
+}
+
 const onItemsChange = (items) => {
   form.items = items
 }
@@ -133,6 +164,17 @@ const submit = async () => {
     ElMessage.warning('请输入操作人')
     return
   }
+
+  const validation = batchTableRef.value.validate()
+  if (!validation.valid) {
+    const errorMsg = validation.errors.map(e => `第${e.rowNumber}行: ${e.message}`).join('\n')
+    ElMessageBox.alert(errorMsg, '数据校验失败', {
+      type: 'error',
+      dangerouslyUseHTMLString: false
+    })
+    return
+  }
+
   const validItems = form.items.filter(i => i.partModel && i.partType && i.shelfNo && i.quantity > 0)
   if (validItems.length === 0) {
     ElMessage.warning('请至少填写一行有效的入库数据')

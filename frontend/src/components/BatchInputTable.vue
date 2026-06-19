@@ -7,6 +7,12 @@
       <el-button type="danger" size="small" @click="clearAll" v-if="showClear">
         <el-icon><Delete /></el-icon> 清空全部
       </el-button>
+      <div class="error-summary" v-if="errorRows.length > 0">
+        <el-tag type="danger">
+          <el-icon><Warning /></el-icon>
+          错误行：{{ errorRows.map(r => r + 1).join('、') }}
+        </el-tag>
+      </div>
     </div>
 
     <el-table
@@ -14,6 +20,7 @@
       border
       style="width: 100%; margin-top: 12px;"
       :row-class-name="rowClassName"
+      :cell-class-name="cellClassName"
     >
       <el-table-column label="序号" type="index" width="60" align="center" />
 
@@ -32,6 +39,7 @@
               placeholder="请选择"
               size="small"
               style="width: 100%;"
+              :class="{ 'cell-error': hasError($index, col.prop) }"
               @change="handleCellChange($index, col.prop)"
             >
               <el-option
@@ -45,9 +53,10 @@
           <template v-else-if="col.type === 'number'">
             <el-input-number
               v-model="row[col.prop]"
-              :min="col.min || 1"
+              :min="col.min !== undefined ? col.min : 1"
               size="small"
               style="width: 100%;"
+              :class="{ 'cell-error': hasError($index, col.prop) }"
               @change="handleCellChange($index, col.prop)"
               controls-position="right"
             />
@@ -57,6 +66,7 @@
               v-model="row[col.prop]"
               :placeholder="col.placeholder || '请输入'"
               size="small"
+              :class="{ 'cell-error': hasError($index, col.prop) }"
               @change="handleCellChange($index, col.prop)"
             />
           </template>
@@ -80,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed, reactive } from 'vue'
 
 const props = defineProps({
   columns: {
@@ -94,10 +104,16 @@ const props = defineProps({
   showClear: {
     type: Boolean,
     default: true
+  },
+  validators: {
+    type: Object,
+    default: () => ({})
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'change'])
+const emit = defineEmits(['update:modelValue', 'change', 'validation-change'])
+
+const rowErrors = reactive({})
 
 const createEmptyRow = () => {
   const row = {}
@@ -111,24 +127,34 @@ const tableData = ref(props.initialData.length > 0 ? [...props.initialData] : [c
 
 const addRow = () => {
   tableData.value.push(createEmptyRow())
+  validateRow(tableData.value.length - 1)
   emitChange()
 }
 
 const removeRow = (index) => {
   if (tableData.value.length <= 1) {
     tableData.value = [createEmptyRow()]
+    clearRowErrors(0)
   } else {
     tableData.value.splice(index, 1)
+    for (let i = index; i < tableData.value.length; i++) {
+      rowErrors[i] = rowErrors[i + 1]
+    }
+    delete rowErrors[tableData.value.length]
   }
   emitChange()
+  emitValidationChange()
 }
 
 const clearAll = () => {
   tableData.value = [createEmptyRow()]
+  Object.keys(rowErrors).forEach(key => delete rowErrors[key])
   emitChange()
+  emitValidationChange()
 }
 
 const handleCellChange = (index, prop) => {
+  validateCell(index, prop)
   emitChange()
 }
 
@@ -137,13 +163,106 @@ const emitChange = () => {
   emit('change', tableData.value)
 }
 
+const emitValidationChange = () => {
+  emit('validation-change', {
+    valid: errorRows.value.length === 0,
+    errorRows: errorRows.value,
+    errors: getAllErrors()
+  })
+}
+
+const validateCell = (rowIndex, prop) => {
+  const validator = props.validators[prop]
+  if (validator) {
+    const value = tableData.value[rowIndex][prop]
+    const row = tableData.value[rowIndex]
+    const result = validator(value, row, rowIndex)
+    if (result && !result.valid) {
+      if (!rowErrors[rowIndex]) rowErrors[rowIndex] = {}
+      rowErrors[rowIndex][prop] = result.message
+    } else {
+      if (rowErrors[rowIndex]) {
+        delete rowErrors[rowIndex][prop]
+        if (Object.keys(rowErrors[rowIndex]).length === 0) {
+          delete rowErrors[rowIndex]
+        }
+      }
+    }
+  }
+  emitValidationChange()
+}
+
+const validateRow = (rowIndex) => {
+  props.columns.forEach(col => {
+    validateCell(rowIndex, col.prop)
+  })
+}
+
+const validateAll = () => {
+  tableData.value.forEach((_, index) => validateRow(index))
+  return {
+    valid: errorRows.value.length === 0,
+    errorRows: errorRows.value,
+    errors: getAllErrors()
+  }
+}
+
+const hasError = (rowIndex, prop) => {
+  return rowErrors[rowIndex] && rowErrors[rowIndex][prop]
+}
+
+const errorRows = computed(() => {
+  return Object.keys(rowErrors).map(Number).sort((a, b) => a - b)
+})
+
+const getAllErrors = () => {
+  const errors = []
+  Object.keys(rowErrors).forEach(rowIndex => {
+    const row = rowErrors[rowIndex]
+    Object.keys(row).forEach(prop => {
+      errors.push({
+        rowIndex: Number(rowIndex),
+        rowNumber: Number(rowIndex) + 1,
+        prop,
+        message: row[prop]
+      })
+    })
+  })
+  return errors
+}
+
+const clearRowErrors = (rowIndex) => {
+  delete rowErrors[rowIndex]
+}
+
+const cellClassName = ({ rowIndex, column }) => {
+  const prop = column.property
+  if (hasError(rowIndex, prop)) {
+    return 'cell-error-cell'
+  }
+  return ''
+}
+
+const rowClassName = ({ rowIndex }) => {
+  const base = rowIndex % 2 === 0 ? '' : 'row-alt'
+  if (rowErrors[rowIndex]) {
+    return `${base} row-error`.trim()
+  }
+  return base
+}
+
 watch(tableData, (val) => {
   emit('update:modelValue', val)
 }, { deep: true })
 
-const rowClassName = ({ rowIndex }) => {
-  return rowIndex % 2 === 0 ? '' : 'row-alt'
-}
+defineExpose({
+  validate: validateAll,
+  validateRow,
+  validateCell,
+  getErrors: getAllErrors,
+  errorRows,
+  hasError
+})
 </script>
 
 <style lang="scss" scoped>
@@ -151,10 +270,43 @@ const rowClassName = ({ rowIndex }) => {
   .batch-toolbar {
     display: flex;
     gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .error-summary {
+    margin-left: auto;
   }
 }
 
 :deep(.row-alt) {
   background-color: #fafafa;
+}
+
+:deep(.row-error) {
+  background-color: #fef0f0 !important;
+}
+
+:deep(.cell-error-cell) {
+  background-color: #fef0f0 !important;
+}
+
+:deep(.cell-error) {
+  .el-input__wrapper,
+  .el-textarea__inner,
+  .el-select__wrapper,
+  .el-input-number__decrease,
+  .el-input-number__increase,
+  .el-input-number .el-input__inner {
+    border-color: #f56c6c !important;
+    box-shadow: 0 0 0 1px #f56c6c inset !important;
+  }
+
+  &.is-focus {
+    .el-input__wrapper,
+    .el-select__wrapper {
+      box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.2) !important;
+    }
+  }
 }
 </style>

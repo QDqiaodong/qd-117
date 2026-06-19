@@ -18,9 +18,11 @@
     </el-form>
 
     <BatchInputTable
+      ref="batchTableRef"
       v-model="form.items"
       :columns="columns"
       :initial-data="form.items"
+      :validators="validators"
       @change="onItemsChange"
     />
 
@@ -119,6 +121,8 @@ const recordPage = reactive({
   pageSize: 10
 })
 
+const batchTableRef = ref(null)
+
 const columns = reactive([
   {
     prop: 'partId',
@@ -142,6 +146,31 @@ const columns = reactive([
   }
 ])
 
+const validators = {
+  partId: (value) => {
+    if (!value) {
+      return { valid: false, message: '请选择零件' }
+    }
+    return { valid: true }
+  },
+  quantity: (value, row) => {
+    if (value === null || value === undefined || value <= 0) {
+      return { valid: false, message: '数量必须大于0' }
+    }
+    const part = partList.value.find(p => p.id === row.partId)
+    if (part && value > part.stockQuantity) {
+      return { valid: false, message: `库存不足(当前:${part.stockQuantity})` }
+    }
+    return { valid: true }
+  },
+  scrapReason: (value) => {
+    if (!value) {
+      return { valid: false, message: '请选择报废原因' }
+    }
+    return { valid: true }
+  }
+}
+
 const loadPartList = async () => {
   try {
     const res = await getPartList()
@@ -164,6 +193,17 @@ const submit = async () => {
     ElMessage.warning('请输入操作人')
     return
   }
+
+  const validation = batchTableRef.value.validate()
+  if (!validation.valid) {
+    const errorMsg = validation.errors.map(e => `第${e.rowNumber}行: ${e.message}`).join('\n')
+    ElMessageBox.alert(errorMsg, '数据校验失败', {
+      type: 'error',
+      dangerouslyUseHTMLString: false
+    })
+    return
+  }
+
   const validItems = form.items.filter(i => i.partId && i.quantity > 0 && i.scrapReason)
   if (validItems.length === 0) {
     ElMessage.warning('请至少填写一行有效的报废记录')

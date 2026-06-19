@@ -25,9 +25,11 @@
     </el-form>
 
     <BatchInputTable
+      ref="batchTableRef"
       v-model="form.items"
       :columns="columns"
       :initial-data="form.items"
+      :validators="validators"
       @change="onItemsChange"
     />
 
@@ -131,6 +133,8 @@ const recordPage = reactive({
   pageSize: 10
 })
 
+const batchTableRef = ref(null)
+
 const columns = reactive([
   {
     prop: 'partId',
@@ -142,6 +146,30 @@ const columns = reactive([
   { prop: 'actualQuantity', label: '实际库存', type: 'number', min: 0, width: 120 },
   { prop: 'remark', label: '差异原因备注', placeholder: '有差异时必填', minWidth: 200 }
 ])
+
+const validators = {
+  partId: (value) => {
+    if (!value) {
+      return { valid: false, message: '请选择零件' }
+    }
+    return { valid: true }
+  },
+  actualQuantity: (value) => {
+    if (value === null || value === undefined || value < 0) {
+      return { valid: false, message: '库存不能为负数' }
+    }
+    return { valid: true }
+  },
+  remark: (value, row) => {
+    const part = partList.value.find(p => p.id === row.partId)
+    const systemQty = part ? part.stockQuantity : 0
+    const diff = row.actualQuantity - systemQty
+    if (diff !== 0 && (!value || value.trim() === '')) {
+      return { valid: false, message: '有差异时请填写原因' }
+    }
+    return { valid: true }
+  }
+}
 
 const loadAllParts = async () => {
   try {
@@ -183,6 +211,17 @@ const submit = async () => {
     ElMessage.warning('请输入盘点人姓名')
     return
   }
+
+  const validation = batchTableRef.value.validate()
+  if (!validation.valid) {
+    const errorMsg = validation.errors.map(e => `第${e.rowNumber}行: ${e.message}`).join('\n')
+    ElMessageBox.alert(errorMsg, '数据校验失败', {
+      type: 'error',
+      dangerouslyUseHTMLString: false
+    })
+    return
+  }
+
   const validItems = form.items.filter(i => i.partId && i.actualQuantity >= 0)
   if (validItems.length === 0) {
     ElMessage.warning('请至少选择一个零件进行盘点')
