@@ -5,7 +5,7 @@
 
 # ---------- 构建阶段 ----------
 ARG DOCKER_REGISTRY
-FROM ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-17-alpine AS build
+FROM ${DOCKER_REGISTRY}maven:3.9-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
@@ -14,16 +14,16 @@ COPY settings.xml /root/.m2/settings.xml
 COPY pom.xml ./
 
 # 预下载全部依赖（pom.xml 不变则缓存命中）
-RUN mvn dependency:go-offline -B -q
+RUN mvn dependency:go-offline -B
 
 # ------ 第2层：仅复制源码，代码变更只触发编译不触发依赖下载 ------
 COPY src ./src
 
-RUN mvn clean package -DskipTests -B -q
+RUN mvn clean package -DskipTests -B
 
 # ---------- 运行阶段 ----------
 ARG DOCKER_REGISTRY
-FROM ${DOCKER_REGISTRY}eclipse-temurin:17-jre-alpine
+FROM ${DOCKER_REGISTRY}eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 

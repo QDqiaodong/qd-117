@@ -1,5 +1,5 @@
 server:
-  port: 8088
+  port: 8117
   address: 127.0.0.1
   servlet:
     context-path: /api
@@ -10,14 +10,14 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://127.0.0.1:3309/inventory_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://127.0.0.1:3317/inventory_db?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
     username: inventory
     password: InventoryPass_2026!
 
   data:
     redis:
       host: 127.0.0.1
-      port: 6380
+      port: 6317
       database: 0
       timeout: 3000ms
       lettuce:

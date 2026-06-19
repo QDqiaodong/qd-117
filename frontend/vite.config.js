@@ -4,8 +4,8 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const frontendPort = Number(env.FRONTEND_PORT) || 3008
-  const backendPort = Number(env.BACKEND_PORT) || 8088
+  const frontendPort = Number(env.FRONTEND_PORT) || 3017
+  const backendPort = Number(env.BACKEND_PORT) || 8117
 
   return {
     plugins: [vue()],

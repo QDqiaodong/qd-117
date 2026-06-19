@@ -166,7 +166,7 @@ const submit = async () => {
     ElMessage.warning('请选择领用产线')
     return
   }
-  if (!form.operator.trim() === '') {
+  if (form.operator.trim() === '') {
     ElMessage.warning('请输入操作人')
     return
   }
@@ -176,7 +176,7 @@ const submit = async () => {
     return
   }
   try {
-    await ElMessageBox.confirm(`确认出库 ${validItems.length} 条记录？', '确认)
+    await ElMessageBox.confirm(`确认出库 ${validItems.length} 条记录？`, '确认')
     submitting.value = true
     await stockOut({
       productionLine: form.productionLine,

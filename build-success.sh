@@ -17,10 +17,10 @@ if [ -f "${ENV_FILE}" ]; then
   REDIS_PORT=$(grep '^REDIS_PORT=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d '[:space:]')
   PROJECT_NAME=$(grep '^PROJECT_NAME=' "${ENV_FILE}" | cut -d'=' -f2 | tr -d '[:space:]')
 else
-  FRONTEND_PORT=3008
-  BACKEND_PORT=8088
-  MYSQL_PORT=3309
-  REDIS_PORT=6380
+  FRONTEND_PORT=3017
+  BACKEND_PORT=8117
+  MYSQL_PORT=3317
+  REDIS_PORT=6317
   PROJECT_NAME=small-parts-inventory
 fi
 

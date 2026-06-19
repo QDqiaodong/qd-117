@@ -4,10 +4,10 @@
           xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
     <mirrors>
         <mirror>
-            <id>netease</id>
+            <id>aliyunmaven</id>
             <mirrorOf>*</mirrorOf>
-            <name>网易 Maven 镜像</name>
-            <url>https://maven.163yun.com/repository/public/</url>
+            <name>Aliyun Maven Public</name>
+            <url>https://maven.aliyun.com/repository/public</url>
         </mirror>
     </mirrors>
 </settings>

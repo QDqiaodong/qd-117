@@ -11,8 +11,7 @@ FROM ${DOCKER_REGISTRY}node:20-alpine AS build
 WORKDIR /app
 
 # 设置国内 npm 镜像源（中科大），无需 VPN
-RUN npm config set registry https://mirrors.ustc.edu.cn/npm/ \
-    && npm config set disturl https://mirrors.ustc.edu.cn/node/
+RUN npm config set registry https://registry.npmmirror.com/
 
 # ------ 第1层：仅复制依赖清单，内容不变更则不触发重下载 ------
 # 生产环境 package-lock.json 优先（若存在则走 npm ci 严格模式）

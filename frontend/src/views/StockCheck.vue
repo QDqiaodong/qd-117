@@ -189,7 +189,7 @@ const submit = async () => {
     return
   }
   try {
-    await ElMessageBox.confirm(`确认保存 ${validItems.length} 条盘点记录？', '确认)
+    await ElMessageBox.confirm(`确认保存 ${validItems.length} 条盘点记录？`, '确认')
     submitting.value = true
     await stockCheck({
       quarter: form.quarter,

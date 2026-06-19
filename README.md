@@ -28,10 +28,10 @@
 
 | 服务 | 宿主机端口 | 容器内端口 | 说明 |
 |------|-----------|-----------|------|
-| 前端 Nginx | **3008** | 80 | 页面访问入口 |
-| 后端 SpringBoot | **8088** | 8088 | REST API (context-path: /api) |
-| MySQL | **3309** | 3306 | 数据库 inventory_db |
-| Redis | **6380** | 6379 | 小件规格参数有序集合缓存 |
+| 前端 Nginx | **3017** | 80 | 页面访问入口 |
+| 后端 SpringBoot | **8117** | 8088 | REST API (context-path: /api) |
+| MySQL | **3317** | 3306 | 数据库 inventory_db |
+| Redis | **6317** | 6379 | 小件规格参数有序集合缓存 |
 
 > 避开了所有常用默认端口：80, 443, 8080, 3306, 6379, 5432, 9200
 
@@ -56,7 +56,7 @@ docker compose ps
 ```
 
 启动成功后访问：
-- **http://localhost:3008** （与 http://127.0.0.1:3008 等价，必须一致）
+- **http://localhost:3017** （与 http://127.0.0.1:3017 等价，必须一致）
 
 ### 方式二：本地开发模式
 
@@ -64,13 +64,13 @@ docker compose ps
 # 1. 先启动 MySQL + Redis
 docker compose up -d mysql redis
 
-# 2. 后端启动 (端口 8088)
+# 2. 后端启动 (端口 8117)
 cd backend
 mvn spring-boot:run
 
-# 3. 前端启动 (端口 3008)
+# 3. 前端启动 (端口 3017)
 cd ../frontend
-npm config set registry https://mirrors.ustc.edu.cn/npm/
+npm config set registry https://registry.npmmirror.com/
 npm install
 npm run dev
 ```
@@ -117,7 +117,7 @@ qd-117/
 │           └── mapper/ (5个 XML)
 └── frontend/
     ├── package.json
-    ├── vite.config.js              # 严格端口 3008 + 127.0.0.1 绑定
+    ├── vite.config.js              # 严格端口 3017 + 127.0.0.1 绑定
     ├── index.html
     ├── nginx.conf                  # 反向代理 /api -> backend:8088
     ├── Dockerfile.dev / Dockerfile.prod
@@ -162,7 +162,7 @@ qd-117/
 | 1 | `package.json` (+ package-lock.json) | 依赖清单变更 |
 | 2 | `.` 剩余源码 | 业务代码变更（仅重跑 build，不重下依赖） |
 
-> npm 镜像：`https://mirrors.ustc.edu.cn/npm/`（中科大）
+> npm 镜像：`https://registry.npmmirror.com/`（npmmirror）
 
 ### 后端 Dockerfile 分层
 | 层 | COPY 内容 | 触发重下载条件 |
@@ -230,14 +230,14 @@ DOCKER_REGISTRY=
 
 ```bash
 # 1. 端口监听检查
-lsof -nP -iTCP:3008 -sTCP:LISTEN
-lsof -nP -iTCP:8088 -sTCP:LISTEN
+lsof -nP -iTCP:3017 -sTCP:LISTEN
+lsof -nP -iTCP:8117 -sTCP:LISTEN
 
 # 2. 127.0.0.1 访问
-curl -sS http://127.0.0.1:3008 | head
+curl -sS http://127.0.0.1:3017 | head
 
 # 3. localhost 访问（必须与上面完全一致）
-curl -sS http://localhost:3008 | head
+curl -sS http://localhost:3017 | head
 ```
 
 > 若出现端口占用，脚本会明确打印 PID 和进程名，禁止自动换端口。
