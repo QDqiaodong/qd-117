@@ -30,6 +30,13 @@ export const getPartSpecs = (params) => {
   })
 }
 
+export const getPinMatrix = () => {
+  return request({
+    url: '/parts/pin-matrix',
+    method: 'get'
+  })
+}
+
 export const createPart = (data) => {
   return request({
     url: '/parts',

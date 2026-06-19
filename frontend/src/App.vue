@@ -24,6 +24,10 @@
             <el-icon><DataBoard /></el-icon>
             <span>库存总览</span>
           </el-menu-item>
+          <el-menu-item index="/pin-matrix">
+            <el-icon><Grid /></el-icon>
+            <span>顶针规格矩阵</span>
+          </el-menu-item>
           <el-menu-item index="/stock-in">
             <el-icon><AddBox /></el-icon>
             <span>小件入库建档</span>

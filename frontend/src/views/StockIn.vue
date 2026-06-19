@@ -117,7 +117,7 @@ const columns = [
       { label: '限位垫片', value: '限位垫片' }
     ]
   },
-  { prop: 'specParams', label: '规格参数', placeholder: '如:直径5mm长度50mm', minWidth: 180 },
+  { prop: 'specParams', label: '规格参数', placeholder: '如:直径5,长度50,材质SKD11', minWidth: 200 },
   { prop: 'shelfNo', label: '货架编号', placeholder: '如:A-01-03', minWidth: 120 },
   { prop: 'quantity', label: '入库数量', type: 'number', min: 1, width: 120 },
   { prop: 'unit', label: '单位', placeholder: '默认:件', width: 100, defaultValue: '件' },

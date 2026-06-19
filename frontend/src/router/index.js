@@ -8,6 +8,12 @@ const routes = [
     meta: { title: '库存总览' }
   },
   {
+    path: '/pin-matrix',
+    name: 'PinMatrix',
+    component: () => import('@/views/PinMatrix.vue'),
+    meta: { title: '顶针规格矩阵' }
+  },
+  {
     path: '/stock-in',
     name: 'StockIn',
     component: () => import('@/views/StockIn.vue'),

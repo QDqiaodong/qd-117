@@ -3,6 +3,7 @@ package com.inventory.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.cache.PartSpecCache;
 import com.inventory.common.Result;
+import com.inventory.dto.PinMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.service.SmallPartService;
 import jakarta.validation.Valid;
@@ -45,6 +46,11 @@ public class SmallPartController {
             return Result.success(partSpecCache.getSpecsByType(partType));
         }
         return Result.success(partSpecCache.getAllSpecs());
+    }
+
+    @GetMapping("/pin-matrix")
+    public Result<PinMatrixVO> getPinMatrix() {
+        return Result.success(smallPartService.getPinMatrix());
     }
 
     @PostMapping
