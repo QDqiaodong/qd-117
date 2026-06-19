@@ -3,9 +3,11 @@ package com.inventory.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.inventory.cache.PartSpecCache;
+import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.exception.BusinessException;
@@ -18,13 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -128,6 +134,99 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
             partSpecCache.addPartSpec(part);
         }
         log.info("小件规格缓存刷新完成，共 {} 条记录", parts.size());
+    }
+
+    public PartSpecCacheDiagnosisVO diagnoseCache() {
+        PartSpecCacheDiagnosisVO vo = new PartSpecCacheDiagnosisVO();
+
+        List<SmallPart> allDbParts = list();
+        List<SmallPart> dbPins = allDbParts.stream()
+                .filter(p -> "顶针".equals(p.getPartType()))
+                .collect(Collectors.toList());
+        List<SmallPart> dbGaskets = allDbParts.stream()
+                .filter(p -> "限位垫片".equals(p.getPartType()))
+                .collect(Collectors.toList());
+
+        vo.setTotalDbCount(allDbParts.size());
+        vo.setPinDbCount(dbPins.size());
+        vo.setGasketDbCount(dbGaskets.size());
+
+        vo.setTotalCacheCount((int) partSpecCache.getTotalSpecCount());
+        vo.setPinCacheCount((int) partSpecCache.getSpecCountByType("顶针"));
+        vo.setGasketCacheCount((int) partSpecCache.getSpecCountByType("限位垫片"));
+
+        vo.setCacheLastUpdateTime(partSpecCache.getLastUpdateTime());
+        LocalDateTime dbLastUpdate = allDbParts.stream()
+                .map(SmallPart::getUpdateTime)
+                .filter(Objects::nonNull)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        vo.setDbLastUpdateTime(dbLastUpdate);
+
+        List<PartSpecCache.PartSpecInfo> allCacheSpecs = partSpecCache.getAllSpecs();
+        Set<String> cacheModels = allCacheSpecs.stream()
+                .map(PartSpecCache.PartSpecInfo::getPartModel)
+                .collect(Collectors.toSet());
+        Set<String> dbModels = allDbParts.stream()
+                .map(SmallPart::getPartModel)
+                .collect(Collectors.toSet());
+
+        List<String> missingInCache = dbModels.stream()
+                .filter(model -> !cacheModels.contains(model))
+                .sorted()
+                .collect(Collectors.toList());
+        vo.setMissingInCache(missingInCache);
+
+        List<String> missingInDb = cacheModels.stream()
+                .filter(model -> !dbModels.contains(model))
+                .sorted()
+                .collect(Collectors.toList());
+        vo.setMissingInDb(missingInDb);
+
+        Map<String, SmallPart> dbPartMap = new HashMap<>();
+        for (SmallPart part : allDbParts) {
+            dbPartMap.put(part.getPartModel(), part);
+        }
+        Map<String, PartSpecCache.PartSpecInfo> cacheSpecMap = new HashMap<>();
+        for (PartSpecCache.PartSpecInfo info : allCacheSpecs) {
+            cacheSpecMap.put(info.getPartModel(), info);
+        }
+
+        List<PartSpecCacheDiagnosisVO.SpecDiff> diffs = new ArrayList<>();
+        for (String model : dbModels) {
+            if (!cacheModels.contains(model)) {
+                continue;
+            }
+            SmallPart dbPart = dbPartMap.get(model);
+            PartSpecCache.PartSpecInfo cacheInfo = cacheSpecMap.get(model);
+            boolean hasDiff = false;
+            if (!Objects.equals(dbPart.getSpecParams(), cacheInfo.getSpecParams())) {
+                hasDiff = true;
+            }
+            if (!Objects.equals(dbPart.getStockQuantity(), cacheInfo.getStockQuantity())) {
+                hasDiff = true;
+            }
+            if (!Objects.equals(dbPart.getShelfNo(), cacheInfo.getShelfNo())) {
+                hasDiff = true;
+            }
+            if (hasDiff) {
+                PartSpecCacheDiagnosisVO.SpecDiff diff = new PartSpecCacheDiagnosisVO.SpecDiff();
+                diff.setPartModel(model);
+                diff.setPartType(dbPart.getPartType());
+                diff.setDbSpecParams(dbPart.getSpecParams());
+                diff.setCacheSpecParams(cacheInfo.getSpecParams());
+                diff.setDbStockQuantity(dbPart.getStockQuantity());
+                diff.setCacheStockQuantity(cacheInfo.getStockQuantity());
+                diff.setDbShelfNo(dbPart.getShelfNo());
+                diff.setCacheShelfNo(cacheInfo.getShelfNo());
+                diffs.add(diff);
+            }
+        }
+        vo.setDiffs(diffs);
+
+        log.info("规格缓存诊断完成：数据库{}条，缓存{}条，缺失缓存{}个，多余缓存{}个，差异{}个",
+                allDbParts.size(), allCacheSpecs.size(), missingInCache.size(), missingInDb.size(), diffs.size());
+        return vo;
     }
 
     public PinMatrixVO getPinMatrix() {

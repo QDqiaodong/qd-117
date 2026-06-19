@@ -3,6 +3,7 @@ package com.inventory.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.cache.PartSpecCache;
 import com.inventory.common.Result;
+import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.service.SmallPartService;
@@ -73,5 +74,10 @@ public class SmallPartController {
     public Result<Void> refreshCache() {
         smallPartService.refreshCache();
         return Result.success();
+    }
+
+    @GetMapping("/cache-diagnosis")
+    public Result<PartSpecCacheDiagnosisVO> getCacheDiagnosis() {
+        return Result.success(smallPartService.diagnoseCache());
     }
 }

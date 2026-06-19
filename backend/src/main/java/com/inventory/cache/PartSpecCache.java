@@ -10,6 +10,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -81,6 +83,42 @@ public class PartSpecCache {
             stringRedisTemplate.delete(keys);
         }
         log.info("小件规格缓存已清空");
+    }
+
+    public long getTotalSpecCount() {
+        Long count = zSetOps.zCard(PART_SPECS_KEY);
+        return count != null ? count : 0;
+    }
+
+    public long getSpecCountByType(String partType) {
+        Long count = zSetOps.zCard(PART_TYPE_PREFIX + partType);
+        return count != null ? count : 0;
+    }
+
+    public LocalDateTime getLastUpdateTime() {
+        Set<ZSetOperations.TypedTuple<String>> tuples = zSetOps.reverseRangeWithScores(PART_SPECS_KEY, 0, 0);
+        if (tuples == null || tuples.isEmpty()) {
+            return null;
+        }
+        ZSetOperations.TypedTuple<String> first = tuples.iterator().next();
+        Double score = first.getScore();
+        if (score == null) {
+            return null;
+        }
+        return LocalDateTime.ofEpochSecond(score.longValue(), 0, ZoneOffset.of("+8"));
+    }
+
+    public LocalDateTime getLastUpdateTimeByType(String partType) {
+        Set<ZSetOperations.TypedTuple<String>> tuples = zSetOps.reverseRangeWithScores(PART_TYPE_PREFIX + partType, 0, 0);
+        if (tuples == null || tuples.isEmpty()) {
+            return null;
+        }
+        ZSetOperations.TypedTuple<String> first = tuples.iterator().next();
+        Double score = first.getScore();
+        if (score == null) {
+            return null;
+        }
+        return LocalDateTime.ofEpochSecond(score.longValue(), 0, ZoneOffset.of("+8"));
     }
 
     private double getPartScore(SmallPart part) {
