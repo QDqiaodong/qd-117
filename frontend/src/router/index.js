@@ -14,6 +14,12 @@ const routes = [
     meta: { title: '顶针规格矩阵' }
   },
   {
+    path: '/shim-matrix',
+    name: 'ShimMatrix',
+    component: () => import('@/views/ShimMatrix.vue'),
+    meta: { title: '垫片厚度视图' }
+  },
+  {
     path: '/stock-in',
     name: 'StockIn',
     component: () => import('@/views/StockIn.vue'),
@@ -30,6 +36,12 @@ const routes = [
     name: 'StockCheck',
     component: () => import('@/views/StockCheck.vue'),
     meta: { title: '季度库存清点' }
+  },
+  {
+    path: '/stock-check-hotzone',
+    name: 'StockCheckHotZone',
+    component: () => import('@/views/StockCheckHotZone.vue'),
+    meta: { title: '季度清点热区' }
   },
   {
     path: '/scrap',

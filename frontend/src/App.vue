@@ -28,6 +28,10 @@
             <el-icon><Grid /></el-icon>
             <span>顶针规格矩阵</span>
           </el-menu-item>
+          <el-menu-item index="/shim-matrix">
+            <el-icon><Coin /></el-icon>
+            <span>垫片厚度视图</span>
+          </el-menu-item>
           <el-menu-item index="/stock-in">
             <el-icon><AddBox /></el-icon>
             <span>小件入库建档</span>
@@ -39,6 +43,10 @@
           <el-menu-item index="/stock-check">
             <el-icon><Finished /></el-icon>
             <span>季度库存清点</span>
+          </el-menu-item>
+          <el-menu-item index="/stock-check-hotzone">
+            <el-icon><Histogram /></el-icon>
+            <span>季度清点热区</span>
           </el-menu-item>
           <el-menu-item index="/scrap">
             <el-icon><Delete /></el-icon>

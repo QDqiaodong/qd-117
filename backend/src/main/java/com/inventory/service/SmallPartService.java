@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.inventory.cache.PartSpecCache;
 import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
+import com.inventory.dto.ShimMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.exception.BusinessException;
 import com.inventory.mapper.SmallPartMapper;
@@ -292,6 +293,58 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         return vo;
     }
 
+    public ShimMatrixVO getShimMatrix() {
+        List<SmallPart> shims = lambdaQuery()
+                .eq(SmallPart::getPartType, "限位垫片")
+                .orderByDesc(SmallPart::getCreateTime)
+                .list();
+
+        ShimMatrixVO vo = new ShimMatrixVO();
+        Map<String, ShimMatrixVO.ShimMatrixCell> cellMap = new LinkedHashMap<>();
+        Set<String> thicknessSet = new LinkedHashSet<>();
+        Set<String> outerDiameterSet = new LinkedHashSet<>();
+        int skipped = 0;
+
+        for (SmallPart part : shims) {
+            ShimSpec spec = parseShimSpec(part.getSpecParams());
+            if (spec.thickness == null || spec.outerDiameter == null) {
+                skipped++;
+                continue;
+            }
+            String key = spec.thickness + "|" + spec.outerDiameter;
+            ShimMatrixVO.ShimMatrixCell cell = cellMap.get(key);
+            if (cell == null) {
+                cell = new ShimMatrixVO.ShimMatrixCell();
+                cell.setThickness(spec.thickness);
+                cell.setOuterDiameter(spec.outerDiameter);
+                cell.setQuantity(0);
+                cell.setShelfNo("");
+                cell.setPartModel("");
+                cellMap.put(key, cell);
+            }
+            int qty = part.getStockQuantity() == null ? 0 : part.getStockQuantity();
+            cell.setQuantity(cell.getQuantity() + qty);
+            cell.setShelfNo(appendDistinct(cell.getShelfNo(), part.getShelfNo()));
+            cell.setPartModel(appendDistinct(cell.getPartModel(), part.getPartModel()));
+            thicknessSet.add(spec.thickness);
+            outerDiameterSet.add(spec.outerDiameter);
+        }
+
+        List<String> thicknesses = new ArrayList<>(thicknessSet);
+        thicknesses.sort((a, b) -> Double.compare(toDouble(a), toDouble(b)));
+        List<String> outerDiameters = new ArrayList<>(outerDiameterSet);
+        outerDiameters.sort((a, b) -> Double.compare(toDouble(a), toDouble(b)));
+
+        vo.setThicknesses(thicknesses);
+        vo.setOuterDiameters(outerDiameters);
+        vo.setCells(new ArrayList<>(cellMap.values()));
+        vo.setTotalTypes(shims.size());
+        vo.setTotalStock(cellMap.values().stream().mapToInt(ShimMatrixVO.ShimMatrixCell::getQuantity).sum());
+        vo.setSkipped(skipped);
+        log.info("垫片厚度矩阵生成：{} 个型号，{} 个规格组合，{} 个未归类", shims.size(), cellMap.size(), skipped);
+        return vo;
+    }
+
     private PinSpec parsePinSpec(String specParams) {
         PinSpec spec = new PinSpec();
         if (specParams == null || specParams.trim().isEmpty()) {
@@ -317,6 +370,32 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         if (spec.material == null || spec.material.isEmpty()) {
             String material = extractMaterial(raw);
             spec.material = material == null ? null : material.trim();
+        }
+        return spec;
+    }
+
+    private ShimSpec parseShimSpec(String specParams) {
+        ShimSpec spec = new ShimSpec();
+        if (specParams == null || specParams.trim().isEmpty()) {
+            return spec;
+        }
+        String raw = specParams.trim();
+        try {
+            JsonNode node = objectMapper.readTree(raw);
+            if (node != null && node.isObject()) {
+                spec.thickness = stripToNumber(getJsonAny(node, "thickness", "厚度", "Thickness", "T"));
+                spec.outerDiameter = stripToNumber(getJsonAny(node, "outerDiameter", "外径", "OuterDiameter", "OD", "外直径"));
+            }
+        } catch (Exception ignored) {
+        }
+        if (spec.thickness == null) {
+            spec.thickness = extractNumber(raw, "厚度");
+        }
+        if (spec.outerDiameter == null) {
+            spec.outerDiameter = extractNumber(raw, "外径");
+        }
+        if (spec.outerDiameter == null) {
+            spec.outerDiameter = extractNumber(raw, "外直径");
         }
         return spec;
     }
@@ -379,5 +458,10 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         private String diameter;
         private String length;
         private String material;
+    }
+
+    private static class ShimSpec {
+        private String thickness;
+        private String outerDiameter;
     }
 }

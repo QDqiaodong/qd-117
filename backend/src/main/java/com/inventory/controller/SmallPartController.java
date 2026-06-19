@@ -5,6 +5,7 @@ import com.inventory.cache.PartSpecCache;
 import com.inventory.common.Result;
 import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
+import com.inventory.dto.ShimMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.service.SmallPartService;
 import jakarta.validation.Valid;
@@ -52,6 +53,11 @@ public class SmallPartController {
     @GetMapping("/pin-matrix")
     public Result<PinMatrixVO> getPinMatrix() {
         return Result.success(smallPartService.getPinMatrix());
+    }
+
+    @GetMapping("/shim-matrix")
+    public Result<ShimMatrixVO> getShimMatrix() {
+        return Result.success(smallPartService.getShimMatrix());
     }
 
     @PostMapping

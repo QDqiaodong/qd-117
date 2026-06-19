@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.inventory.dto.StockCheckDTO;
+import com.inventory.dto.StockCheckHotZoneVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.entity.StockCheckRecord;
 import com.inventory.mapper.StockCheckRecordMapper;
@@ -14,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -28,6 +31,65 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
                                                 String quarter, String startTime, String endTime) {
         Page<StockCheckRecord> page = new Page<>(pageNum, pageSize);
         return stockCheckRecordMapper.selectPageList(page, partModel, quarter, startTime, endTime);
+    }
+
+    public StockCheckHotZoneVO getHotZone(String quarter) {
+        List<StockCheckHotZoneVO.HotZoneRow> rows = stockCheckRecordMapper.selectHotZoneRows(quarter);
+
+        Map<String, StockCheckHotZoneVO.ShelfHotZone> shelfMap = new LinkedHashMap<>();
+        int totalGain = 0;
+        int totalLoss = 0;
+
+        for (StockCheckHotZoneVO.HotZoneRow row : rows) {
+            String shelfNo = (row.getShelfNo() == null || row.getShelfNo().isEmpty()) ? "未归类" : row.getShelfNo();
+            StockCheckHotZoneVO.ShelfHotZone shelf = shelfMap.computeIfAbsent(shelfNo, k -> {
+                StockCheckHotZoneVO.ShelfHotZone s = new StockCheckHotZoneVO.ShelfHotZone();
+                s.setShelfNo(k);
+                s.setPinGain(0);
+                s.setPinLoss(0);
+                s.setGasketGain(0);
+                s.setGasketLoss(0);
+                s.setTotalGain(0);
+                s.setTotalLoss(0);
+                s.setRowCount(0);
+                s.setRows(new ArrayList<>());
+                return s;
+            });
+            shelf.getRows().add(row);
+            shelf.setRowCount(shelf.getRowCount() + 1);
+
+            int diff = row.getDiffQuantity() == null ? 0 : row.getDiffQuantity();
+            String partType = row.getPartType();
+            if ("顶针".equals(partType)) {
+                if (diff >= 0) {
+                    shelf.setPinGain(shelf.getPinGain() + diff);
+                } else {
+                    shelf.setPinLoss(shelf.getPinLoss() + (-diff));
+                }
+            } else if ("限位垫片".equals(partType)) {
+                if (diff >= 0) {
+                    shelf.setGasketGain(shelf.getGasketGain() + diff);
+                } else {
+                    shelf.setGasketLoss(shelf.getGasketLoss() + (-diff));
+                }
+            }
+            if (diff >= 0) {
+                shelf.setTotalGain(shelf.getTotalGain() + diff);
+                totalGain += diff;
+            } else {
+                shelf.setTotalLoss(shelf.getTotalLoss() + (-diff));
+                totalLoss += (-diff);
+            }
+        }
+
+        StockCheckHotZoneVO vo = new StockCheckHotZoneVO();
+        vo.setShelves(new ArrayList<>(shelfMap.values()));
+        vo.setTotalShelves(shelfMap.size());
+        vo.setTotalGain(totalGain);
+        vo.setTotalLoss(totalLoss);
+        vo.setTotalRows(rows.size());
+        log.info("盘点热区生成：季度={}，货架数={}，盘盈={}，盘亏={}", quarter, shelfMap.size(), totalGain, totalLoss);
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)

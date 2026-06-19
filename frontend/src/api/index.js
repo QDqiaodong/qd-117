@@ -37,6 +37,13 @@ export const getPinMatrix = () => {
   })
 }
 
+export const getShimMatrix = () => {
+  return request({
+    url: '/parts/shim-matrix',
+    method: 'get'
+  })
+}
+
 export const createPart = (data) => {
   return request({
     url: '/parts',
@@ -112,6 +119,14 @@ export const stockCheck = (data) => {
     url: '/stock-check',
     method: 'post',
     data
+  })
+}
+
+export const getStockCheckHotZone = (params) => {
+  return request({
+    url: '/stock-check/hot-zone',
+    method: 'get',
+    params
   })
 }
 

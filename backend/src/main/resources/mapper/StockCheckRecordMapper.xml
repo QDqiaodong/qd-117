@@ -35,4 +35,39 @@
         ORDER BY create_time DESC
     </select>
 
+    <resultMap id="HotZoneRowMap" type="com.inventory.dto.StockCheckHotZoneVO$HotZoneRow">
+        <result column="shelf_no" property="shelfNo"/>
+        <result column="part_model" property="partModel"/>
+        <result column="part_type" property="partType"/>
+        <result column="system_quantity" property="systemQuantity"/>
+        <result column="actual_quantity" property="actualQuantity"/>
+        <result column="diff_quantity" property="diffQuantity"/>
+        <result column="check_person" property="checkPerson"/>
+        <result column="remark" property="remark"/>
+        <result column="quarter" property="quarter"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectHotZoneRows" resultMap="HotZoneRowMap">
+        SELECT
+            scr.shelf_no,
+            scr.part_model,
+            sp.part_type,
+            scr.system_quantity,
+            scr.actual_quantity,
+            scr.diff_quantity,
+            scr.check_person,
+            scr.remark,
+            scr.quarter,
+            scr.create_time
+        FROM stock_check_record scr
+        LEFT JOIN small_part sp ON scr.part_id = sp.id
+        <where>
+            <if test="quarter != null and quarter != ''">
+                AND scr.quarter = #{quarter}
+            </if>
+        </where>
+        ORDER BY scr.shelf_no, sp.part_type, scr.create_time DESC
+    </select>
+
 </mapper>

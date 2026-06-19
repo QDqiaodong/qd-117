@@ -3,6 +3,7 @@ package com.inventory.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.common.Result;
 import com.inventory.dto.StockCheckDTO;
+import com.inventory.dto.StockCheckHotZoneVO;
 import com.inventory.entity.StockCheckRecord;
 import com.inventory.service.StockCheckService;
 import jakarta.validation.Valid;
@@ -32,5 +33,10 @@ public class StockCheckController {
     @PostMapping
     public Result<List<StockCheckRecord>> checkStock(@Valid @RequestBody StockCheckDTO dto) {
         return Result.success("盘点记录保存成功", stockCheckService.checkStock(dto));
+    }
+
+    @GetMapping("/hot-zone")
+    public Result<StockCheckHotZoneVO> getHotZone(@RequestParam(required = false) String quarter) {
+        return Result.success(stockCheckService.getHotZone(quarter));
     }
 }
