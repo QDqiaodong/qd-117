@@ -52,6 +52,10 @@
             <el-icon><Delete /></el-icon>
             <span>破损零件报废</span>
           </el-menu-item>
+          <el-menu-item index="/batch-proofread">
+            <el-icon><Finished /></el-icon>
+            <span>批量录入校对</span>
+          </el-menu-item>
           <el-menu-item index="/records">
             <el-icon><Document /></el-icon>
             <span>流水记录查询</span>

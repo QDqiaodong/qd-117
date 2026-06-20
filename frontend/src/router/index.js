@@ -54,6 +54,12 @@ const routes = [
     name: 'Records',
     component: () => import('@/views/Records.vue'),
     meta: { title: '流水记录查询' }
+  },
+  {
+    path: '/batch-proofread',
+    name: 'BatchProofread',
+    component: () => import('@/views/BatchProofread.vue'),
+    meta: { title: '批量录入校对' }
   }
 ]
 
