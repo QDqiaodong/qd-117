@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS stock_check_record (
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
     INDEX idx_quarter (quarter),
-    INDEX idx_part_model_create_time (part_model, create_time DESC)
+    INDEX idx_part_model_create_time (part_model, create_time DESC),
+    UNIQUE KEY uk_part_model_quarter (part_model, quarter)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存盘点记录表';
 
 CREATE TABLE IF NOT EXISTS scrap_record (

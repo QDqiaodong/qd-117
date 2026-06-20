@@ -4,13 +4,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.common.Result;
 import com.inventory.dto.StockCheckDTO;
 import com.inventory.dto.StockCheckHotZoneVO;
+import com.inventory.dto.StockCheckResultVO;
 import com.inventory.entity.StockCheckRecord;
 import com.inventory.service.StockCheckService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/stock-check")
@@ -31,8 +30,12 @@ public class StockCheckController {
     }
 
     @PostMapping
-    public Result<List<StockCheckRecord>> checkStock(@Valid @RequestBody StockCheckDTO dto) {
-        return Result.success("盘点记录保存成功", stockCheckService.checkStock(dto));
+    public Result<StockCheckResultVO> checkStock(@Valid @RequestBody StockCheckDTO dto) {
+        StockCheckResultVO result = stockCheckService.checkStock(dto);
+        if (result.getDuplicateRecords() != null && !result.getDuplicateRecords().isEmpty()) {
+            return Result.success("存在重复盘点记录", result);
+        }
+        return Result.success("盘点记录保存成功", result);
     }
 
     @GetMapping("/hot-zone")

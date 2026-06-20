@@ -20,5 +20,8 @@ public interface StockCheckRecordMapper extends BaseMapper<StockCheckRecord> {
                                             @Param("endTime") String endTime);
 
     List<StockCheckHotZoneVO.HotZoneRow> selectHotZoneRows(@Param("quarter") String quarter);
+
+    List<StockCheckRecord> selectByQuarterAndPartModels(@Param("quarter") String quarter,
+                                                        @Param("partModels") List<String> partModels);
 }
 

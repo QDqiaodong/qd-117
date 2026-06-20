@@ -118,6 +118,32 @@
         <el-button type="primary" @click="errorDialogVisible = false">我知道了，去修改</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="duplicateDialogVisible" title="存在重复盘点记录" width="600px" :close-on-click-modal="true" top="8vh">
+      <el-alert type="warning" show-icon :closable="false" style="margin-bottom: 16px;">
+        共发现 {{ duplicateRecords.length }} 条重复盘点记录，同一型号在同一季度只能保留一条有效记录。
+      </el-alert>
+      <el-table :data="duplicateRecords" stripe border size="small" style="width: 100%;">
+        <el-table-column prop="partModel" label="零件型号" min-width="140" />
+        <el-table-column prop="systemQuantity" label="系统库存" width="90" align="center" />
+        <el-table-column prop="actualQuantity" label="实际库存" width="90" align="center" />
+        <el-table-column prop="diffQuantity" label="差异" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.diffQuantity > 0 ? 'success' : (row.diffQuantity < 0 ? 'danger' : 'info')">
+              {{ row.diffQuantity > 0 ? '+' : '' }}{{ row.diffQuantity }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="checkPerson" label="盘点人" width="90" align="center" />
+        <el-table-column prop="createTime" label="盘点时间" width="160" align="center" />
+      </el-table>
+      <div style="margin-top: 12px; font-size: 13px; color: #909399;">
+        新增盘点记录 {{ addedCount }} 条，重复记录 {{ duplicateRecords.length }} 条已跳过。
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="handleDuplicateConfirm">我知道了</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -134,6 +160,9 @@ const recordData = ref([])
 const recordTotal = ref(0)
 const errorDialogVisible = ref(false)
 const validationErrors = ref([])
+const duplicateDialogVisible = ref(false)
+const duplicateRecords = ref([])
+const addedCount = ref(0)
 const fieldLabelMap = {
   partId: '选择零件',
   actualQuantity: '实际库存',
@@ -279,19 +308,31 @@ const submit = async () => {
   try {
     await ElMessageBox.confirm(`确认保存 ${validItems.length} 条盘点记录？`, '确认')
     submitting.value = true
-    await stockCheck({
+    const res = await stockCheck({
       quarter: form.quarter,
       checkPerson: form.checkPerson,
       items: validItems
     })
-    ElMessage.success('盘点记录保存成功')
-    resetForm()
+    const result = res.data
+    if (result.duplicateRecords && result.duplicateRecords.length > 0) {
+      duplicateRecords.value = result.duplicateRecords
+      addedCount.value = result.addedRecords ? result.addedRecords.length : 0
+      duplicateDialogVisible.value = true
+    } else {
+      ElMessage.success('盘点记录保存成功')
+      resetForm()
+    }
     loadRecords()
   } catch (e) {
     console.error(e)
   } finally {
     submitting.value = false
   }
+}
+
+const handleDuplicateConfirm = () => {
+  duplicateDialogVisible.value = false
+  resetForm()
 }
 
 const jumpToErrorRow = (rowIndex) => {

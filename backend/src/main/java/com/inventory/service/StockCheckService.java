@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.inventory.dto.StockCheckDTO;
 import com.inventory.dto.StockCheckHotZoneVO;
+import com.inventory.dto.StockCheckResultVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.entity.StockCheckRecord;
 import com.inventory.mapper.StockCheckRecordMapper;
@@ -18,6 +19,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -93,11 +96,44 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public List<StockCheckRecord> checkStock(StockCheckDTO dto) {
-        List<StockCheckRecord> records = new ArrayList<>();
+    public StockCheckResultVO checkStock(StockCheckDTO dto) {
+        StockCheckResultVO result = new StockCheckResultVO();
+        List<StockCheckRecord> addedRecords = new ArrayList<>();
+        List<StockCheckRecord> duplicateRecords = new ArrayList<>();
+
+        List<Long> partIds = dto.getItems().stream()
+                .map(StockCheckDTO.StockCheckItem::getPartId)
+                .collect(Collectors.toList());
+
+        List<SmallPart> parts = smallPartService.listByIds(partIds);
+        Map<Long, SmallPart> partMap = parts.stream()
+                .collect(Collectors.toMap(SmallPart::getId, p -> p));
+
+        List<String> partModels = parts.stream()
+                .map(SmallPart::getPartModel)
+                .collect(Collectors.toList());
+
+        List<StockCheckRecord> existingRecords = stockCheckRecordMapper
+                .selectByQuarterAndPartModels(dto.getQuarter(), partModels);
+
+        Set<String> existingModelSet = existingRecords.stream()
+                .map(StockCheckRecord::getPartModel)
+                .collect(Collectors.toSet());
+
+        Map<String, StockCheckRecord> existingRecordMap = existingRecords.stream()
+                .collect(Collectors.toMap(StockCheckRecord::getPartModel, r -> r));
 
         for (StockCheckDTO.StockCheckItem item : dto.getItems()) {
-            SmallPart part = smallPartService.getById(item.getPartId());
+            SmallPart part = partMap.get(item.getPartId());
+            if (part == null) {
+                continue;
+            }
+
+            if (existingModelSet.contains(part.getPartModel())) {
+                duplicateRecords.add(existingRecordMap.get(part.getPartModel()));
+                continue;
+            }
+
             int systemQuantity = part.getStockQuantity();
             int actualQuantity = item.getActualQuantity();
             int diffQuantity = actualQuantity - systemQuantity;
@@ -114,7 +150,7 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
             record.setQuarter(dto.getQuarter());
             record.setCreateTime(LocalDateTime.now());
             save(record);
-            records.add(record);
+            addedRecords.add(record);
 
             if (diffQuantity != 0) {
                 log.warn("库存差异: 型号={}, 系统库存={}, 实际库存={}, 差异={}",
@@ -123,6 +159,9 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
                 log.info("盘点一致: 型号={}, 库存数量={}", part.getPartModel(), actualQuantity);
             }
         }
-        return records;
+
+        result.setAddedRecords(addedRecords);
+        result.setDuplicateRecords(duplicateRecords);
+        return result;
     }
 }

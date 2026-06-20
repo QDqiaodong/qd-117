@@ -70,4 +70,13 @@
         ORDER BY scr.shelf_no, sp.part_type, scr.create_time DESC
     </select>
 
+    <select id="selectByQuarterAndPartModels" resultMap="BaseResultMap">
+        SELECT * FROM stock_check_record
+        WHERE quarter = #{quarter}
+        AND part_model IN
+        <foreach collection="partModels" item="model" open="(" separator="," close=")">
+            #{model}
+        </foreach>
+    </select>
+
 </mapper>
