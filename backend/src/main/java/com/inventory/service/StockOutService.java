@@ -24,6 +24,7 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
 
     private final StockOutRecordMapper stockOutRecordMapper;
     private final SmallPartService smallPartService;
+    private final ShelfCapacityService shelfCapacityService;
 
     public IPage<StockOutRecord> getPageList(Integer pageNum, Integer pageSize, String partModel,
                                               String productionLine, String startTime, String endTime) {
@@ -49,6 +50,12 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
 
             smallPartService.decreaseStock(part.getId(), item.getQuantity());
 
+            if ("顶针".equals(part.getPartType())) {
+                shelfCapacityService.decreasePinBoxes(part.getShelfNo(), item.getQuantity());
+            } else if ("限位垫片".equals(part.getPartType())) {
+                shelfCapacityService.decreaseShimPacks(part.getShelfNo(), item.getQuantity());
+            }
+
             StockOutRecord record = new StockOutRecord();
             record.setPartId(part.getId());
             record.setPartModel(part.getPartModel());
@@ -61,8 +68,9 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
             save(record);
             records.add(record);
 
-            log.info("出库登记: 型号={}, 数量={}, 产线={}, 操作人={}",
-                    part.getPartModel(), item.getQuantity(), dto.getProductionLine(), dto.getOperator());
+            log.info("出库登记: 型号={}, 数量={}, 产线={}, 货架={}, 操作人={}",
+                    part.getPartModel(), item.getQuantity(), dto.getProductionLine(),
+                    part.getShelfNo(), dto.getOperator());
         }
         return records;
     }

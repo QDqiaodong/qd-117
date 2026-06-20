@@ -3,6 +3,7 @@ package com.inventory.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.common.Result;
 import com.inventory.dto.StockInDTO;
+import com.inventory.dto.StockInValidationVO;
 import com.inventory.entity.StockInRecord;
 import com.inventory.service.StockInService;
 import jakarta.validation.Valid;
@@ -26,6 +27,11 @@ public class StockInController {
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false) String endTime) {
         return Result.success(stockInService.getPageList(pageNum, pageSize, partModel, startTime, endTime));
+    }
+
+    @PostMapping("/validate")
+    public Result<StockInValidationVO> validate(@Valid @RequestBody StockInDTO dto) {
+        return Result.success(stockInService.validate(dto));
     }
 
     @PostMapping

@@ -72,3 +72,17 @@ CREATE TABLE IF NOT EXISTS scrap_record (
     INDEX idx_create_time (create_time),
     INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报废记录表';
+
+CREATE TABLE IF NOT EXISTS shelf_capacity (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    shelf_no VARCHAR(50) NOT NULL COMMENT '货架编号',
+    max_pin_boxes INT NOT NULL DEFAULT 0 COMMENT '顶针最大盒数',
+    max_shim_packs INT NOT NULL DEFAULT 0 COMMENT '垫片最大包数',
+    current_pin_boxes INT NOT NULL DEFAULT 0 COMMENT '当前顶针盒数',
+    current_shim_packs INT NOT NULL DEFAULT 0 COMMENT '当前垫片包数',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_shelf_no (shelf_no),
+    INDEX idx_shelf_no (shelf_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='货架容量表';

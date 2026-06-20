@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.inventory.dto.StockInDTO;
+import com.inventory.dto.StockInValidationVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.entity.StockInRecord;
+import com.inventory.exception.BusinessException;
 import com.inventory.mapper.StockInRecordMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,19 +25,35 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
 
     private final StockInRecordMapper stockInRecordMapper;
     private final SmallPartService smallPartService;
+    private final ShelfCapacityService shelfCapacityService;
 
     public IPage<StockInRecord> getPageList(Integer pageNum, Integer pageSize, String partModel, String startTime, String endTime) {
         Page<StockInRecord> page = new Page<>(pageNum, pageSize);
         return stockInRecordMapper.selectPageList(page, partModel, startTime, endTime);
     }
 
+    public StockInValidationVO validate(StockInDTO dto) {
+        return shelfCapacityService.validateStockIn(dto);
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public List<StockInRecord> stockIn(StockInDTO dto) {
+        StockInValidationVO validation = validate(dto);
+        if (!validation.isValid()) {
+            String errorMsg = String.join("; ", validation.getErrors());
+            throw new BusinessException(errorMsg);
+        }
+
         List<StockInRecord> records = new ArrayList<>();
         for (StockInDTO.StockInItem item : dto.getItems()) {
-            SmallPart part = smallPartService.getByModel(item.getPartModel());
+            SmallPart existingPart = smallPartService.getByModel(item.getPartModel());
+            String oldShelfNo = existingPart != null ? existingPart.getShelfNo() : null;
+            boolean isNewPart = existingPart == null;
+            boolean shelfChanged = existingPart != null && item.getShelfNo() != null
+                    && !item.getShelfNo().isEmpty() && !item.getShelfNo().equals(existingPart.getShelfNo());
 
-            if (part == null) {
+            SmallPart part;
+            if (isNewPart) {
                 part = new SmallPart();
                 part.setPartModel(item.getPartModel());
                 part.setPartName(item.getPartName() != null ? item.getPartName() : item.getPartModel());
@@ -47,6 +65,7 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                 part.setRemark(item.getRemark());
                 part = smallPartService.create(part);
             } else {
+                part = existingPart;
                 if (item.getPartName() != null && !item.getPartName().isEmpty()) {
                     part.setPartName(item.getPartName());
                 }
@@ -63,6 +82,30 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                 smallPartService.increaseStock(part.getId(), item.getQuantity());
             }
 
+            if ("顶针".equals(item.getPartType())) {
+                if (shelfChanged && oldShelfNo != null) {
+                    int oldQty = existingPart != null && existingPart.getStockQuantity() != null
+                            ? existingPart.getStockQuantity() : 0;
+                    if (oldQty > 0) {
+                        shelfCapacityService.decreasePinBoxes(oldShelfNo, oldQty);
+                    }
+                    shelfCapacityService.increasePinBoxes(item.getShelfNo(), oldQty + item.getQuantity());
+                } else {
+                    shelfCapacityService.increasePinBoxes(item.getShelfNo(), item.getQuantity());
+                }
+            } else if ("限位垫片".equals(item.getPartType())) {
+                if (shelfChanged && oldShelfNo != null) {
+                    int oldQty = existingPart != null && existingPart.getStockQuantity() != null
+                            ? existingPart.getStockQuantity() : 0;
+                    if (oldQty > 0) {
+                        shelfCapacityService.decreaseShimPacks(oldShelfNo, oldQty);
+                    }
+                    shelfCapacityService.increaseShimPacks(item.getShelfNo(), oldQty + item.getQuantity());
+                } else {
+                    shelfCapacityService.increaseShimPacks(item.getShelfNo(), item.getQuantity());
+                }
+            }
+
             StockInRecord record = new StockInRecord();
             record.setPartId(part.getId());
             record.setPartModel(part.getPartModel());
@@ -74,7 +117,8 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             save(record);
             records.add(record);
 
-            log.info("入库登记: 型号={}, 数量={}, 操作人={}", part.getPartModel(), item.getQuantity(), dto.getOperator());
+            log.info("入库登记: 型号={}, 数量={}, 货架={}, 操作人={}",
+                    part.getPartModel(), item.getQuantity(), item.getShelfNo(), dto.getOperator());
         }
         return records;
     }

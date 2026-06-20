@@ -24,6 +24,7 @@ public class ScrapService extends ServiceImpl<ScrapRecordMapper, ScrapRecord> {
 
     private final ScrapRecordMapper scrapRecordMapper;
     private final SmallPartService smallPartService;
+    private final ShelfCapacityService shelfCapacityService;
 
     public IPage<ScrapRecord> getPageList(Integer pageNum, Integer pageSize, String partModel,
                                                String scrapReason, String startTime, String endTime) {
@@ -49,6 +50,12 @@ public class ScrapService extends ServiceImpl<ScrapRecordMapper, ScrapRecord> {
 
             smallPartService.decreaseStock(part.getId(), item.getQuantity());
 
+            if ("顶针".equals(part.getPartType())) {
+                shelfCapacityService.decreasePinBoxes(part.getShelfNo(), item.getQuantity());
+            } else if ("限位垫片".equals(part.getPartType())) {
+                shelfCapacityService.decreaseShimPacks(part.getShelfNo(), item.getQuantity());
+            }
+
             ScrapRecord record = new ScrapRecord();
             record.setPartId(part.getId());
             record.setPartModel(part.getPartModel());
@@ -60,8 +67,9 @@ public class ScrapService extends ServiceImpl<ScrapRecordMapper, ScrapRecord> {
             save(record);
             records.add(record);
 
-            log.info("报废登记: 型号={}, 数量={}, 原因={}, 操作人={}",
-                    part.getPartModel(), item.getQuantity(), item.getScrapReason(), dto.getOperator());
+            log.info("报废登记: 型号={}, 数量={}, 原因={}, 货架={}, 操作人={}",
+                    part.getPartModel(), item.getQuantity(), item.getScrapReason(),
+                    part.getShelfNo(), dto.getOperator());
         }
         return records;
     }

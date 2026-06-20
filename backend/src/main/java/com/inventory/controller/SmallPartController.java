@@ -8,6 +8,7 @@ import com.inventory.dto.PinMatrixVO;
 import com.inventory.dto.ShimMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.service.SmallPartService;
+import com.inventory.spec.ParsedSpec;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -85,5 +86,16 @@ public class SmallPartController {
     @GetMapping("/cache-diagnosis")
     public Result<PartSpecCacheDiagnosisVO> getCacheDiagnosis() {
         return Result.success(smallPartService.diagnoseCache());
+    }
+
+    @GetMapping("/parse-spec/{id}")
+    public Result<ParsedSpec> parseSpecById(@PathVariable Long id) {
+        SmallPart part = smallPartService.getById(id);
+        return Result.success(smallPartService.parseSpec(part));
+    }
+
+    @PostMapping("/parse-spec")
+    public Result<ParsedSpec> parseSpec(@RequestParam String partType, @RequestParam String specParams) {
+        return Result.success(smallPartService.parseSpec(partType, specParams));
     }
 }

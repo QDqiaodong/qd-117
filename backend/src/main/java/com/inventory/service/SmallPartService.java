@@ -3,9 +3,6 @@ package com.inventory.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.inventory.cache.PartSpecCache;
 import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
@@ -13,6 +10,8 @@ import com.inventory.dto.ShimMatrixVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.exception.BusinessException;
 import com.inventory.mapper.SmallPartMapper;
+import com.inventory.spec.ParsedSpec;
+import com.inventory.spec.SpecParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -29,8 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -40,7 +37,7 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
 
     private final SmallPartMapper smallPartMapper;
     private final PartSpecCache partSpecCache;
-    private final ObjectMapper objectMapper;
+    private final SpecParser specParser;
 
     public IPage<SmallPart> getPageList(Integer pageNum, Integer pageSize, String partType, String keyword) {
         Page<SmallPart> page = new Page<>(pageNum, pageSize);
@@ -230,6 +227,14 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         return vo;
     }
 
+    public ParsedSpec parseSpec(SmallPart part) {
+        return specParser.parse(part.getPartType(), part.getSpecParams());
+    }
+
+    public ParsedSpec parseSpec(String partType, String specParams) {
+        return specParser.parse(partType, specParams);
+    }
+
     public PinMatrixVO getPinMatrix() {
         List<SmallPart> pins = lambdaQuery()
                 .eq(SmallPart::getPartType, "顶针")
@@ -244,19 +249,19 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         int skipped = 0;
 
         for (SmallPart part : pins) {
-            PinSpec spec = parsePinSpec(part.getSpecParams());
-            if (spec.diameter == null || spec.length == null) {
+            ParsedSpec spec = specParser.parse("顶针", part.getSpecParams());
+            if (spec.getDiameter() == null || spec.getLength() == null) {
                 skipped++;
                 continue;
             }
-            String material = (spec.material == null || spec.material.isEmpty()) ? "未指定" : spec.material;
-            String key = material + "|" + spec.diameter + "|" + spec.length;
+            String material = (spec.getMaterial() == null || spec.getMaterial().isEmpty()) ? "未指定" : spec.getMaterial();
+            String key = material + "|" + spec.getDiameter() + "|" + spec.getLength();
             PinMatrixVO.PinMatrixCell cell = cellMap.get(key);
             if (cell == null) {
                 cell = new PinMatrixVO.PinMatrixCell();
                 cell.setMaterial(material);
-                cell.setDiameter(spec.diameter);
-                cell.setLength(spec.length);
+                cell.setDiameter(spec.getDiameter());
+                cell.setLength(spec.getLength());
                 cell.setQuantity(0);
                 cell.setShelfNo("");
                 cell.setPartModel("");
@@ -267,8 +272,8 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
             cell.setShelfNo(appendDistinct(cell.getShelfNo(), part.getShelfNo()));
             cell.setPartModel(appendDistinct(cell.getPartModel(), part.getPartModel()));
             materialSet.add(material);
-            diameterSet.add(spec.diameter);
-            lengthSet.add(spec.length);
+            diameterSet.add(spec.getDiameter());
+            lengthSet.add(spec.getLength());
         }
 
         List<String> diameters = new ArrayList<>(diameterSet);
@@ -306,17 +311,17 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         int skipped = 0;
 
         for (SmallPart part : shims) {
-            ShimSpec spec = parseShimSpec(part.getSpecParams());
-            if (spec.thickness == null || spec.outerDiameter == null) {
+            ParsedSpec spec = specParser.parse("限位垫片", part.getSpecParams());
+            if (spec.getThickness() == null || spec.getOuterDiameter() == null) {
                 skipped++;
                 continue;
             }
-            String key = spec.thickness + "|" + spec.outerDiameter;
+            String key = spec.getThickness() + "|" + spec.getOuterDiameter();
             ShimMatrixVO.ShimMatrixCell cell = cellMap.get(key);
             if (cell == null) {
                 cell = new ShimMatrixVO.ShimMatrixCell();
-                cell.setThickness(spec.thickness);
-                cell.setOuterDiameter(spec.outerDiameter);
+                cell.setThickness(spec.getThickness());
+                cell.setOuterDiameter(spec.getOuterDiameter());
                 cell.setQuantity(0);
                 cell.setShelfNo("");
                 cell.setPartModel("");
@@ -326,8 +331,8 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
             cell.setQuantity(cell.getQuantity() + qty);
             cell.setShelfNo(appendDistinct(cell.getShelfNo(), part.getShelfNo()));
             cell.setPartModel(appendDistinct(cell.getPartModel(), part.getPartModel()));
-            thicknessSet.add(spec.thickness);
-            outerDiameterSet.add(spec.outerDiameter);
+            thicknessSet.add(spec.getThickness());
+            outerDiameterSet.add(spec.getOuterDiameter());
         }
 
         List<String> thicknesses = new ArrayList<>(thicknessSet);
@@ -343,92 +348,6 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         vo.setSkipped(skipped);
         log.info("垫片厚度矩阵生成：{} 个型号，{} 个规格组合，{} 个未归类", shims.size(), cellMap.size(), skipped);
         return vo;
-    }
-
-    private PinSpec parsePinSpec(String specParams) {
-        PinSpec spec = new PinSpec();
-        if (specParams == null || specParams.trim().isEmpty()) {
-            return spec;
-        }
-        String raw = specParams.trim();
-        try {
-            JsonNode node = objectMapper.readTree(raw);
-            if (node != null && node.isObject()) {
-                spec.diameter = stripToNumber(getJsonAny(node, "diameter", "直径", "Diameter", "D"));
-                spec.length = stripToNumber(getJsonAny(node, "length", "长度", "Length", "L"));
-                String material = getJsonAny(node, "material", "材质", "Material", "M");
-                spec.material = material == null ? null : material.trim();
-            }
-        } catch (Exception ignored) {
-        }
-        if (spec.diameter == null) {
-            spec.diameter = extractNumber(raw, "直径");
-        }
-        if (spec.length == null) {
-            spec.length = extractNumber(raw, "长度");
-        }
-        if (spec.material == null || spec.material.isEmpty()) {
-            String material = extractMaterial(raw);
-            spec.material = material == null ? null : material.trim();
-        }
-        return spec;
-    }
-
-    private ShimSpec parseShimSpec(String specParams) {
-        ShimSpec spec = new ShimSpec();
-        if (specParams == null || specParams.trim().isEmpty()) {
-            return spec;
-        }
-        String raw = specParams.trim();
-        try {
-            JsonNode node = objectMapper.readTree(raw);
-            if (node != null && node.isObject()) {
-                spec.thickness = stripToNumber(getJsonAny(node, "thickness", "厚度", "Thickness", "T"));
-                spec.outerDiameter = stripToNumber(getJsonAny(node, "outerDiameter", "外径", "OuterDiameter", "OD", "外直径"));
-            }
-        } catch (Exception ignored) {
-        }
-        if (spec.thickness == null) {
-            spec.thickness = extractNumber(raw, "厚度");
-        }
-        if (spec.outerDiameter == null) {
-            spec.outerDiameter = extractNumber(raw, "外径");
-        }
-        if (spec.outerDiameter == null) {
-            spec.outerDiameter = extractNumber(raw, "外直径");
-        }
-        return spec;
-    }
-
-    private String getJsonAny(JsonNode node, String... keys) {
-        for (String key : keys) {
-            JsonNode value = node.get(key);
-            if (value != null && !value.isNull()) {
-                String text = value.isTextual() ? value.asText() : value.toString();
-                if (text != null && !text.trim().isEmpty()) {
-                    return text.trim();
-                }
-            }
-        }
-        return null;
-    }
-
-    private String stripToNumber(String text) {
-        if (text == null) {
-            return null;
-        }
-        Matcher matcher = NUMBER_PATTERN.matcher(text);
-        return matcher.find() ? matcher.group(1) : (text.trim().isEmpty() ? null : text.trim());
-    }
-
-    private String extractNumber(String text, String keyword) {
-        Matcher matcher = Pattern.compile(keyword + "\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)").matcher(text);
-        return matcher.find() ? matcher.group(1) : null;
-    }
-
-    private String extractMaterial(String text) {
-        Matcher matcher = MATERIAL_PATTERN.matcher(text);
-        return matcher.find() ? matcher.group(1) : null;
     }
 
     private double toDouble(String text) {
@@ -449,19 +368,5 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         }
         set.add(value);
         return String.join(", ", set);
-    }
-
-    private static final Pattern NUMBER_PATTERN = Pattern.compile("(\\d+(?:\\.\\d+)?)");
-    private static final Pattern MATERIAL_PATTERN = Pattern.compile("材质\\s*[:：]?\\s*([A-Za-z0-9\\u4e00-\\u9fa5_\\-]+)");
-
-    private static class PinSpec {
-        private String diameter;
-        private String length;
-        private String material;
-    }
-
-    private static class ShimSpec {
-        private String thickness;
-        private String outerDiameter;
     }
 }
