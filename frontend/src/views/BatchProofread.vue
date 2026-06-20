@@ -118,12 +118,56 @@
       <el-icon color="#67c23a" size="48"><Check /></el-icon>
       <p style="margin-top: 12px; color: #67c23a; font-size: 16px;">所有数据一致性检查通过！</p>
     </div>
+
+    <el-dialog
+      v-model="fieldErrorDialogVisible"
+      title="字段校验失败"
+      width="560px"
+      :close-on-click-modal="true"
+      top="8vh"
+    >
+      <el-alert
+        type="error"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        共发现 {{ fieldValidationErrors.length }} 条字段级错误，请先修正后再检查一致性。
+      </el-alert>
+      <div class="validation-errors">
+        <div
+          v-for="(group, gIdx) in groupedFieldErrors"
+          :key="gIdx"
+          class="error-row-group"
+        >
+          <div class="error-row-header" @click="jumpToFieldError(group)">
+            <el-icon color="#f56c6c"><Warning /></el-icon>
+            <span class="row-label">[{{ group.section }}] 第 {{ group.rowNumber }} 行</span>
+            <span class="locate-hint">
+              <el-icon><Aim /></el-icon> 点击定位
+            </span>
+          </div>
+          <ul class="error-item-list">
+            <li v-for="(err, eIdx) in group.errors" :key="eIdx">
+              <span class="error-field">{{ err.fieldLabel }}：</span>
+              <span class="error-msg">{{ err.message }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="fieldErrorDialogVisible = false">
+          我知道了，去修改
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
 import { getPartList } from '@/api'
 
@@ -131,10 +175,43 @@ const activeTab = ref('stockIn')
 const checking = ref(false)
 const hasRunCheck = ref(false)
 const partList = ref([])
+const fieldErrorDialogVisible = ref(false)
+const fieldValidationErrors = ref([])
 
 const stockInTableRef = ref(null)
 const stockOutTableRef = ref(null)
 const scrapTableRef = ref(null)
+
+const sectionFieldLabelMap = {
+  stockIn: {
+    partModel: '零件型号',
+    partName: '零件名称',
+    partType: '零件类型',
+    specParams: '规格参数',
+    shelfNo: '货架编号',
+    quantity: '入库数量',
+    unit: '单位'
+  },
+  stockOut: {
+    partId: '选择零件',
+    partModel: '零件型号',
+    shelfNo: '货架编号',
+    quantity: '领用数量'
+  },
+  scrap: {
+    partId: '选择零件',
+    partModel: '零件型号',
+    shelfNo: '货架编号',
+    quantity: '报废数量',
+    scrapReason: '报废原因'
+  }
+}
+
+const sectionNameMap = {
+  stockIn: '入库',
+  stockOut: '出库',
+  scrap: '报废'
+}
 
 const form = reactive({
   operator: '',
@@ -287,6 +364,36 @@ const issueSummary = computed(() => {
   return { type: 'success', text: '全部通过' }
 })
 
+const groupedFieldErrors = computed(() => {
+  const map = new Map()
+  fieldValidationErrors.value.forEach(err => {
+    const sectionKey = err.section
+    const sectionMap = sectionKey === '入库' ? 'stockIn' : (sectionKey === '出库' ? 'stockOut' : 'scrap')
+    const key = `${sectionMap}-${err.rowIndex}`
+    if (!map.has(key)) {
+      map.set(key, {
+        section: sectionKey,
+        sectionMap,
+        rowIndex: err.rowIndex,
+        rowNumber: err.rowNumber,
+        errors: []
+      })
+    }
+    const labelMap = sectionFieldLabelMap[sectionMap] || {}
+    map.get(key).errors.push({
+      prop: err.prop,
+      fieldLabel: labelMap[err.prop] || err.prop,
+      message: err.message
+    })
+  })
+  return Array.from(map.values()).sort((a, b) => {
+    const sectionOrder = { stockIn: 0, stockOut: 1, scrap: 2 }
+    const s = sectionOrder[a.sectionMap] - sectionOrder[b.sectionMap]
+    if (s !== 0) return s
+    return a.rowIndex - b.rowIndex
+  })
+})
+
 const loadPartList = async () => {
   try {
     const res = await getPartList()
@@ -374,12 +481,9 @@ const runConsistencyCheck = async () => {
         ...stockOutValidation.errors.map(e => ({ ...e, section: '出库' })),
         ...scrapValidation.errors.map(e => ({ ...e, section: '报废' }))
       ]
-      consistencyIssues.value.push({
-        type: 'error',
-        title: '单条数据校验失败',
-        description: `共发现 ${allErrors.length} 条字段级错误，请先修正后再检查一致性。`,
-        details: allErrors.map(e => `[${e.section}] 第${e.rowNumber}行: ${e.message}`)
-      })
+      fieldValidationErrors.value = allErrors
+      fieldErrorDialogVisible.value = true
+      return
     }
 
     const { stockInValid, stockOutValid, scrapValid } = getAllValidRows()
@@ -610,6 +714,23 @@ const resetForm = () => {
   consistencyIssues.value = []
   hasRunCheck.value = false
   activeTab.value = 'stockIn'
+  fieldValidationErrors.value = []
+}
+
+const jumpToFieldError = async (group) => {
+  const tabName = group.sectionMap
+  if (activeTab.value !== tabName) {
+    activeTab.value = tabName
+    await nextTick()
+    await new Promise(r => setTimeout(r, 100))
+  }
+  const tableRef = tabName === 'stockIn'
+    ? stockInTableRef.value
+    : (tabName === 'stockOut' ? stockOutTableRef.value : scrapTableRef.value)
+  if (tableRef && typeof tableRef.scrollToRow === 'function') {
+    tableRef.scrollToRow(group.rowIndex)
+  }
+  fieldErrorDialogVisible.value = false
 }
 
 onMounted(() => {
@@ -631,6 +752,76 @@ onMounted(() => {
     padding: 40px;
     background: #f0f9eb;
     border-radius: 8px;
+  }
+}
+
+.validation-errors {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.error-row-group {
+  border: 1px solid #fbc4c4;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background: #fef0f0;
+  overflow: hidden;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.error-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fde2e2;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #f9c7c7;
+  }
+
+  .row-label {
+    font-weight: 600;
+    color: #c45656;
+    font-size: 14px;
+  }
+
+  .locate-hint {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #909399;
+    font-size: 12px;
+  }
+}
+
+.error-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 14px 10px 38px;
+
+  li {
+    padding: 4px 0;
+    line-height: 1.5;
+    font-size: 13px;
+    color: #606266;
+  }
+
+  .error-field {
+    color: #e6a23c;
+    font-weight: 500;
+  }
+
+  .error-msg {
+    color: #f56c6c;
   }
 }
 </style>

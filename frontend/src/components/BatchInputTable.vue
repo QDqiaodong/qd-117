@@ -16,6 +16,7 @@
     </div>
 
     <el-table
+      ref="tableRef"
       :data="tableData"
       border
       style="width: 100%; margin-top: 12px;"
@@ -90,7 +91,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, reactive } from 'vue'
+import { ref, watch, computed, reactive, nextTick } from 'vue'
 
 const props = defineProps({
   modelValue: {
@@ -118,6 +119,9 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'change', 'validation-change'])
 
 const rowErrors = reactive({})
+const tableRef = ref(null)
+const highlightRowIndex = ref(-1)
+let highlightTimer = null
 
 const createEmptyRow = () => {
   const row = {}
@@ -145,16 +149,51 @@ const addRow = () => {
 const removeRow = (index) => {
   if (tableData.value.length <= 1) {
     tableData.value = [createEmptyRow()]
-    clearRowErrors(0)
+    Object.keys(rowErrors).forEach(key => delete rowErrors[key])
   } else {
     tableData.value.splice(index, 1)
-    for (let i = index; i < tableData.value.length; i++) {
-      rowErrors[i] = rowErrors[i + 1]
-    }
-    delete rowErrors[tableData.value.length]
+    Object.keys(rowErrors).forEach(key => delete rowErrors[key])
+    tableData.value.forEach((_, i) => {
+      props.columns.forEach(col => {
+        const validator = props.validators[col.prop]
+        if (validator) {
+          const value = tableData.value[i][col.prop]
+          const row = tableData.value[i]
+          const result = validator(value, row, i)
+          if (result && !result.valid) {
+            if (!rowErrors[i]) rowErrors[i] = {}
+            rowErrors[i][col.prop] = result.message
+          }
+        }
+      })
+    })
   }
   emitChange()
   emitValidationChange()
+}
+
+const scrollToRow = async (rowIndex) => {
+  if (rowIndex < 0 || rowIndex >= tableData.value.length) return
+  await nextTick()
+  const table = tableRef.value
+  if (table) {
+    const rows = table.$el.querySelectorAll('.el-table__body-wrapper tbody tr')
+    if (rows[rowIndex]) {
+      rows[rowIndex].scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+  triggerRowHighlight(rowIndex)
+}
+
+const triggerRowHighlight = (rowIndex) => {
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+  highlightRowIndex.value = rowIndex
+  highlightTimer = setTimeout(() => {
+    highlightRowIndex.value = -1
+  }, 2500)
 }
 
 const clearAll = () => {
@@ -256,10 +295,14 @@ const cellClassName = ({ rowIndex, column }) => {
 
 const rowClassName = ({ rowIndex }) => {
   const base = rowIndex % 2 === 0 ? '' : 'row-alt'
+  const classes = [base]
   if (rowErrors[rowIndex]) {
-    return `${base} row-error`.trim()
+    classes.push('row-error')
   }
-  return base
+  if (highlightRowIndex.value === rowIndex) {
+    classes.push('row-highlight')
+  }
+  return classes.join(' ').trim()
 }
 
 watch(tableData, (val) => {
@@ -283,7 +326,8 @@ defineExpose({
   validateCell,
   getErrors: getAllErrors,
   errorRows,
-  hasError
+  hasError,
+  scrollToRow
 })
 </script>
 
@@ -307,6 +351,20 @@ defineExpose({
 
 :deep(.row-error) {
   background-color: #fef0f0 !important;
+}
+
+:deep(.row-highlight) {
+  background-color: #fff7e6 !important;
+  animation: rowHighlightPulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes rowHighlightPulse {
+  from {
+    background-color: #fff7e6 !important;
+  }
+  to {
+    background-color: #ffd666 !important;
+  }
 }
 
 :deep(.cell-error-cell) {

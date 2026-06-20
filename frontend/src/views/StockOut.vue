@@ -101,12 +101,37 @@
         @current-change="loadRecords"
       />
     </div>
+
+    <el-dialog v-model="errorDialogVisible" title="数据校验失败" width="560px" :close-on-click-modal="true" top="8vh">
+      <el-alert type="error" show-icon :closable="false" style="margin-bottom: 16px;">
+        共发现 {{ validationErrors.length }} 条字段级错误，请修正后再提交。
+      </el-alert>
+      <div class="validation-errors">
+        <div v-for="(group, gIdx) in groupedValidationErrors" :key="gIdx" class="error-row-group">
+          <div class="error-row-header" @click="jumpToErrorRow(group.rowIndex)">
+            <el-icon color="#f56c6c"><Warning /></el-icon>
+            <span class="row-label">第 {{ group.rowNumber }} 行</span>
+            <span class="locate-hint"><el-icon><Aim /></el-icon> 点击定位</span>
+          </div>
+          <ul class="error-item-list">
+            <li v-for="(err, eIdx) in group.errors" :key="eIdx">
+              <span class="error-field">{{ err.fieldLabel }}：</span>
+              <span class="error-msg">{{ err.message }}</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="errorDialogVisible = false">我知道了，去修改</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
 import { stockOut, getStockOutPage, getPartList } from '@/api'
 
@@ -114,6 +139,12 @@ const submitting = ref(false)
 const loading = ref(false)
 const recordData = ref([])
 const recordTotal = ref(0)
+const errorDialogVisible = ref(false)
+const validationErrors = ref([])
+const fieldLabelMap = {
+  partId: '选择零件',
+  quantity: '领用数量'
+}
 const partList = ref([])
 
 const form = reactive({
@@ -136,6 +167,26 @@ const recordPage = reactive({
 })
 
 const batchTableRef = ref(null)
+
+const groupedValidationErrors = computed(() => {
+  const map = new Map()
+  validationErrors.value.forEach(err => {
+    const key = err.rowIndex
+    if (!map.has(key)) {
+      map.set(key, {
+        rowIndex: err.rowIndex,
+        rowNumber: err.rowNumber,
+        errors: []
+      })
+    }
+    map.get(key).errors.push({
+      prop: err.prop,
+      fieldLabel: fieldLabelMap[err.prop] || err.prop,
+      message: err.message
+    })
+  })
+  return Array.from(map.values()).sort((a, b) => a.rowIndex - b.rowIndex)
+})
 
 const columns = reactive([
   {
@@ -196,11 +247,8 @@ const submit = async () => {
 
   const validation = batchTableRef.value.validate()
   if (!validation.valid) {
-    const errorMsg = validation.errors.map(e => `第${e.rowNumber}行: ${e.message}`).join('\n')
-    ElMessageBox.alert(errorMsg, '数据校验失败', {
-      type: 'error',
-      dangerouslyUseHTMLString: false
-    })
+    validationErrors.value = validation.errors
+    errorDialogVisible.value = true
     return
   }
 
@@ -228,6 +276,13 @@ const submit = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+const jumpToErrorRow = (rowIndex) => {
+  if (batchTableRef.value && typeof batchTableRef.value.scrollToRow === 'function') {
+    batchTableRef.value.scrollToRow(rowIndex)
+  }
+  errorDialogVisible.value = false
 }
 
 const resetForm = () => {
@@ -263,3 +318,75 @@ onMounted(() => {
   loadRecords()
 })
 </script>
+
+<style lang="scss" scoped>
+.validation-errors {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.error-row-group {
+  border: 1px solid #fbc4c4;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  background: #fef0f0;
+  overflow: hidden;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.error-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: #fde2e2;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s;
+
+  &:hover {
+    background: #f9c7c7;
+  }
+
+  .row-label {
+    font-weight: 600;
+    color: #c45656;
+    font-size: 14px;
+  }
+
+  .locate-hint {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #909399;
+    font-size: 12px;
+  }
+}
+
+.error-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 10px 14px 10px 38px;
+
+  li {
+    padding: 4px 0;
+    line-height: 1.5;
+    font-size: 13px;
+    color: #606266;
+  }
+
+  .error-field {
+    color: #e6a23c;
+    font-weight: 500;
+  }
+
+  .error-msg {
+    color: #f56c6c;
+  }
+}
+</style>
