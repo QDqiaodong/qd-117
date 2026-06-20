@@ -2,6 +2,9 @@ package com.inventory.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.inventory.common.Result;
+import com.inventory.dto.DiffConfirmDTO;
+import com.inventory.dto.SnapshotInitiateDTO;
+import com.inventory.dto.SnapshotVO;
 import com.inventory.dto.StockCheckDTO;
 import com.inventory.dto.StockCheckHotZoneVO;
 import com.inventory.dto.StockCheckResultVO;
@@ -25,8 +28,20 @@ public class StockCheckController {
             @RequestParam(required = false) String partModel,
             @RequestParam(required = false) String quarter,
             @RequestParam(required = false) String startTime,
-            @RequestParam(required = false) String endTime) {
-        return Result.success(stockCheckService.getPageList(pageNum, pageSize, partModel, quarter, startTime, endTime));
+            @RequestParam(required = false) String endTime,
+            @RequestParam(required = false) Integer confirmStatus) {
+        return Result.success(stockCheckService.getPageList(pageNum, pageSize, partModel, quarter, startTime, endTime, confirmStatus));
+    }
+
+    @PostMapping("/snapshot/initiate")
+    public Result<SnapshotVO> initiateSnapshot(@Valid @RequestBody SnapshotInitiateDTO dto) {
+        SnapshotVO vo = stockCheckService.initiateSnapshot(dto);
+        return Result.success("盘点快照创建成功，已冻结账面库存", vo);
+    }
+
+    @GetMapping("/snapshot")
+    public Result<SnapshotVO> getSnapshot(@RequestParam String quarter) {
+        return Result.success(stockCheckService.getSnapshot(quarter));
     }
 
     @PostMapping
@@ -36,6 +51,12 @@ public class StockCheckController {
             return Result.success("存在重复盘点记录", result);
         }
         return Result.success("盘点记录保存成功", result);
+    }
+
+    @PostMapping("/diff/confirm")
+    public Result<Void> confirmDiff(@Valid @RequestBody DiffConfirmDTO dto) {
+        stockCheckService.confirmDiff(dto);
+        return Result.success("差异确认成功");
     }
 
     @GetMapping("/hot-zone")

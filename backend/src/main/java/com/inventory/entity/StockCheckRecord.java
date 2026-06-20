@@ -43,5 +43,15 @@ public class StockCheckRecord implements Serializable {
     @NotBlank(message = "盘点季度不能为空")
     private String quarter;
 
+    private Long snapshotId;
+
+    private Integer confirmStatus;
+
+    private String handleConclusion;
+
+    private String confirmPerson;
+
+    private LocalDateTime confirmTime;
+
     private LocalDateTime createTime;
 }

@@ -114,9 +114,33 @@ export const getStockCheckPage = (params) => {
   })
 }
 
+export const initiateStockCheckSnapshot = (data) => {
+  return request({
+    url: '/stock-check/snapshot/initiate',
+    method: 'post',
+    data
+  })
+}
+
+export const getStockCheckSnapshot = (params) => {
+  return request({
+    url: '/stock-check/snapshot',
+    method: 'get',
+    params
+  })
+}
+
 export const stockCheck = (data) => {
   return request({
     url: '/stock-check',
+    method: 'post',
+    data
+  })
+}
+
+export const confirmStockCheckDiff = (data) => {
+  return request({
+    url: '/stock-check/diff/confirm',
     method: 'post',
     data
   })

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.inventory.mapper.StockCheckSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.inventory.entity.StockCheckSnapshot">
+        <id column="id" property="id"/>
+        <result column="quarter" property="quarter"/>
+        <result column="part_id" property="partId"/>
+        <result column="part_model" property="partModel"/>
+        <result column="part_name" property="partName"/>
+        <result column="part_type" property="partType"/>
+        <result column="frozen_stock_quantity" property="frozenStockQuantity"/>
+        <result column="frozen_shelf_no" property="frozenShelfNo"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="selectByQuarter" resultMap="BaseResultMap">
+        SELECT * FROM stock_check_snapshot
+        WHERE quarter = #{quarter}
+        ORDER BY part_type, part_model
+    </select>
+
+    <select id="selectByQuarterAndPartId" resultMap="BaseResultMap">
+        SELECT * FROM stock_check_snapshot
+        WHERE quarter = #{quarter} AND part_id = #{partId}
+        LIMIT 1
+    </select>
+
+    <delete id="deleteByQuarter">
+        DELETE FROM stock_check_snapshot WHERE quarter = #{quarter}
+    </delete>
+
+</mapper>

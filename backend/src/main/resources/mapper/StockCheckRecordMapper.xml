@@ -13,6 +13,11 @@
         <result column="check_person" property="checkPerson"/>
         <result column="remark" property="remark"/>
         <result column="quarter" property="quarter"/>
+        <result column="snapshot_id" property="snapshotId"/>
+        <result column="confirm_status" property="confirmStatus"/>
+        <result column="handle_conclusion" property="handleConclusion"/>
+        <result column="confirm_person" property="confirmPerson"/>
+        <result column="confirm_time" property="confirmTime"/>
         <result column="create_time" property="createTime"/>
     </resultMap>
 
@@ -30,6 +35,9 @@
             </if>
             <if test="quarter != null and quarter != ''">
                 AND quarter = #{quarter}
+            </if>
+            <if test="confirmStatus != null">
+                AND confirm_status = #{confirmStatus}
             </if>
         </where>
         ORDER BY create_time DESC, id DESC
@@ -78,5 +86,14 @@
             #{model}
         </foreach>
     </select>
+
+    <update id="updateConfirm">
+        UPDATE stock_check_record
+        SET confirm_status = 1,
+            handle_conclusion = #{handleConclusion},
+            confirm_person = #{confirmPerson},
+            confirm_time = #{confirmTime}
+        WHERE id = #{id} AND diff_quantity != 0
+    </update>
 
 </mapper>

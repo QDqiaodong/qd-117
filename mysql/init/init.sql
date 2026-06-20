@@ -42,20 +42,41 @@ CREATE TABLE IF NOT EXISTS stock_out_record (
     INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='出库领用记录表';
 
+CREATE TABLE IF NOT EXISTS stock_check_snapshot (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    quarter VARCHAR(20) NOT NULL COMMENT '盘点季度：2024-Q1',
+    part_id BIGINT NOT NULL COMMENT '小件ID',
+    part_model VARCHAR(100) NOT NULL COMMENT '零件型号',
+    part_name VARCHAR(100) NOT NULL COMMENT '零件名称',
+    part_type VARCHAR(50) NOT NULL COMMENT '零件类型：顶针/限位垫片',
+    frozen_stock_quantity INT NOT NULL COMMENT '冻结时账面库存数量',
+    frozen_shelf_no VARCHAR(50) NOT NULL COMMENT '冻结时货架编号',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_quarter (quarter),
+    INDEX idx_part_id (part_id),
+    UNIQUE KEY uk_quarter_part_id (quarter, part_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='季度盘点库存快照表';
+
 CREATE TABLE IF NOT EXISTS stock_check_record (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     part_id BIGINT NOT NULL COMMENT '小件ID',
     part_model VARCHAR(100) NOT NULL COMMENT '零件型号',
-    system_quantity INT NOT NULL COMMENT '系统库存数量',
+    system_quantity INT NOT NULL COMMENT '系统库存数量（基于快照）',
     actual_quantity INT NOT NULL COMMENT '实际库存数量',
     diff_quantity INT NOT NULL COMMENT '差异数量',
     shelf_no VARCHAR(50) NOT NULL COMMENT '货架编号',
     check_person VARCHAR(50) NOT NULL COMMENT '盘点人',
     remark VARCHAR(500) COMMENT '差异原因备注',
     quarter VARCHAR(20) NOT NULL COMMENT '盘点季度：2024-Q1',
+    snapshot_id BIGINT COMMENT '关联快照ID',
+    confirm_status TINYINT NOT NULL DEFAULT 0 COMMENT '差异确认状态：0-未确认，1-已闭环',
+    handle_conclusion VARCHAR(500) COMMENT '处理结论',
+    confirm_person VARCHAR(50) COMMENT '确认人',
+    confirm_time DATETIME COMMENT '确认时间',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
     INDEX idx_quarter (quarter),
+    INDEX idx_confirm_status (confirm_status),
     INDEX idx_part_model_create_time (part_model, create_time DESC),
     UNIQUE KEY uk_part_model_quarter (part_model, quarter)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存盘点记录表';

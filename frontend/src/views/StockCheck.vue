@@ -4,21 +4,28 @@
 
     <el-form :model="form" label-width="100px" style="margin-bottom: 16px;">
       <el-row :gutter="16">
-        <el-col :span="8">
+        <el-col :span="6">
           <el-form-item label="盘点季度">
             <el-input v-model="form.quarter" :placeholder="currentQuarter" />
           </el-form-item>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="6">
           <el-form-item label="盘点人">
             <el-input v-model="form.checkPerson" placeholder="请输入盘点人姓名" />
           </el-form-item>
         </el-col>
-        <el-col :span="8">
+        <el-col :span="12">
           <el-form-item label=" ">
-            <el-button type="warning" @click="loadAllParts">
-              <el-icon><List /></el-icon> 载入全部库存
+            <el-button type="primary" @click="initiateSnapshot" :loading="snapshotLoading">
+              <el-icon><Camera /></el-icon> 发起季度盘点（冻结快照）
             </el-button>
+            <el-button type="warning" @click="loadFromSnapshot" :loading="snapshotLoading" :disabled="!snapshotReady">
+              <el-icon><List /></el-icon> 从快照载入库存
+            </el-button>
+            <el-tag v-if="snapshotReady" type="success" effect="dark">
+              快照已就绪：{{ snapshotInfo.totalCount }} 项（顶针{{ snapshotInfo.pinCount }} / 垫片{{ snapshotInfo.shimCount }}）
+            </el-tag>
+            <el-tag v-else type="info" effect="plain">尚未创建该季度快照</el-tag>
           </el-form-item>
         </el-col>
       </el-row>
@@ -50,6 +57,10 @@
       <div class="toolbar-left">
         <el-input v-model="searchForm.partModel" placeholder="零件型号" clearable style="width: 200px;" />
         <el-input v-model="searchForm.quarter" placeholder="盘点季度如:2024-Q1" clearable style="width: 180px;" />
+        <el-select v-model="searchForm.confirmStatus" placeholder="确认状态" clearable style="width: 140px;">
+          <el-option label="未确认差异" :value="0" />
+          <el-option label="已闭环" :value="1" />
+        </el-select>
         <el-date-picker
           v-model="searchForm.dateRange"
           type="daterange"
@@ -67,7 +78,7 @@
 
     <el-table :data="recordData" stripe border v-loading="loading" style="width: 100%;">
       <el-table-column prop="partModel" label="零件型号" min-width="140" />
-      <el-table-column prop="systemQuantity" label="系统库存" width="100" align="center" />
+      <el-table-column prop="systemQuantity" label="快照账面" width="100" align="center" />
       <el-table-column prop="actualQuantity" label="实际库存" width="100" align="center" />
       <el-table-column prop="diffQuantity" label="差异" width="100" align="center">
         <template #default="{ row }">
@@ -79,8 +90,31 @@
       <el-table-column prop="shelfNo" label="货架" width="100" align="center" />
       <el-table-column prop="checkPerson" label="盘点人" width="100" align="center" />
       <el-table-column prop="quarter" label="季度" width="100" align="center" />
-      <el-table-column prop="remark" label="差异原因" min-width="150" show-overflow-tooltip />
+      <el-table-column label="确认状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.diffQuantity === 0" type="info" size="small">无差异</el-tag>
+          <el-tag v-else-if="row.confirmStatus === 1" type="success" size="small">已闭环</el-tag>
+          <el-tag v-else type="warning" size="small">待确认</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="remark" label="差异原因" min-width="130" show-overflow-tooltip />
+      <el-table-column prop="handleConclusion" label="处理结论" min-width="150" show-overflow-tooltip />
+      <el-table-column prop="confirmPerson" label="确认人" width="90" align="center" />
       <el-table-column prop="createTime" label="盘点时间" width="170" align="center" />
+      <el-table-column label="操作" width="110" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.diffQuantity !== 0 && row.confirmStatus !== 1"
+            type="primary"
+            size="small"
+            link
+            @click="openConfirmDialog(row)"
+          >
+            确认差异
+          </el-button>
+          <span v-else style="color: #c0c4cc;">-</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <div style="margin-top: 20px; text-align: right;">
@@ -125,7 +159,7 @@
       </el-alert>
       <el-table :data="duplicateRecords" stripe border size="small" style="width: 100%;">
         <el-table-column prop="partModel" label="零件型号" min-width="140" />
-        <el-table-column prop="systemQuantity" label="系统库存" width="90" align="center" />
+        <el-table-column prop="systemQuantity" label="快照账面" width="90" align="center" />
         <el-table-column prop="actualQuantity" label="实际库存" width="90" align="center" />
         <el-table-column prop="diffQuantity" label="差异" width="80" align="center">
           <template #default="{ row }">
@@ -144,18 +178,69 @@
         <el-button type="primary" @click="handleDuplicateConfirm">我知道了</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="confirmDialogVisible" title="差异确认处理" width="560px" :close-on-click-modal="true" top="10vh">
+      <el-alert
+        :type="confirmRow.diffQuantity > 0 ? 'success' : 'danger'"
+        show-icon
+        :closable="false"
+        style="margin-bottom: 16px;"
+      >
+        <span>零件型号：<strong>{{ confirmRow.partModel }}</strong></span>
+        <span style="margin-left: 20px;">差异数量：
+          <strong :style="{ color: confirmRow.diffQuantity > 0 ? '#67c23a' : '#f56c6c' }">
+            {{ confirmRow.diffQuantity > 0 ? '+' : '' }}{{ confirmRow.diffQuantity }}
+          </strong>
+          （{{ confirmRow.diffQuantity > 0 ? '盘盈' : '盘亏' }}）
+        </span>
+      </el-alert>
+      <el-form :model="confirmForm" label-width="100px">
+        <el-form-item label="快照账面">
+          <span>{{ confirmRow.systemQuantity }}</span>
+        </el-form-item>
+        <el-form-item label="实际库存">
+          <span>{{ confirmRow.actualQuantity }}</span>
+        </el-form-item>
+        <el-form-item label="差异原因">
+          <span>{{ confirmRow.remark || '（未填写）' }}</span>
+        </el-form-item>
+        <el-form-item label="处理结论" required>
+          <el-input
+            v-model="confirmForm.handleConclusion"
+            type="textarea"
+            :rows="3"
+            placeholder="请填写处理结论，如：已补入库 / 已出库未登记 / 同意盘亏核销 等"
+          />
+        </el-form-item>
+        <el-form-item label="确认人" required>
+          <el-input v-model="confirmForm.confirmPerson" placeholder="请输入确认人姓名" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="confirmDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="confirmSubmitting" @click="submitConfirm">确认闭环</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Aim, Warning } from '@element-plus/icons-vue'
+import { Aim, Warning, Camera, Check, RefreshLeft, List, Search } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
-import { stockCheck, getStockCheckPage, getPartList } from '@/api'
+import {
+  stockCheck,
+  getStockCheckPage,
+  getPartList,
+  initiateStockCheckSnapshot,
+  getStockCheckSnapshot,
+  confirmStockCheckDiff
+} from '@/api'
 
 const submitting = ref(false)
 const loading = ref(false)
+const snapshotLoading = ref(false)
 const recordData = ref([])
 const recordTotal = ref(0)
 const errorDialogVisible = ref(false)
@@ -163,12 +248,26 @@ const validationErrors = ref([])
 const duplicateDialogVisible = ref(false)
 const duplicateRecords = ref([])
 const addedCount = ref(0)
+const confirmDialogVisible = ref(false)
+const confirmSubmitting = ref(false)
+const confirmRow = reactive({})
+const confirmForm = reactive({
+  handleConclusion: '',
+  confirmPerson: ''
+})
 const fieldLabelMap = {
   partId: '选择零件',
   actualQuantity: '实际库存',
   remark: '差异原因备注'
 }
 const partList = ref([])
+const snapshotItems = ref([])
+const snapshotReady = ref(false)
+const snapshotInfo = reactive({
+  totalCount: 0,
+  pinCount: 0,
+  shimCount: 0
+})
 
 const currentQuarter = computed(() => {
   const now = new Date()
@@ -186,6 +285,7 @@ const form = reactive({
 const searchForm = reactive({
   partModel: '',
   quarter: '',
+  confirmStatus: null,
   dateRange: []
 })
 
@@ -228,6 +328,11 @@ const columns = reactive([
   { prop: 'remark', label: '差异原因备注', placeholder: '有差异时必填', minWidth: 200 }
 ])
 
+const getSnapshotQty = (partId) => {
+  const snap = snapshotItems.value.find(s => s.partId === partId)
+  return snap ? snap.frozenStockQuantity : null
+}
+
 const validators = {
   partId: (value) => {
     if (!value) {
@@ -242,9 +347,11 @@ const validators = {
     return { valid: true }
   },
   remark: (value, row) => {
-    const part = partList.value.find(p => p.id === row.partId)
-    const systemQty = part ? part.stockQuantity : 0
-    const diff = row.actualQuantity - systemQty
+    const snapQty = getSnapshotQty(row.partId)
+    if (snapQty === null) {
+      return { valid: true }
+    }
+    const diff = row.actualQuantity - snapQty
     if (diff !== 0 && (!value || value.trim() === '')) {
       return { valid: false, message: '有差异时请填写原因' }
     }
@@ -252,17 +359,66 @@ const validators = {
   }
 }
 
-const loadAllParts = async () => {
+const initiateSnapshot = async () => {
+  if (!form.quarter.trim()) {
+    ElMessage.warning('请先输入盘点季度，如：2024-Q1')
+    return
+  }
   try {
-    const res = await getPartList()
-    form.items = res.data.filter(p => p.stockQuantity > 0).map(p => ({
-      partId: p.id,
-      actualQuantity: p.stockQuantity,
-      remark: ''
-    }))
-    ElMessage.success(`已载入 ${form.items.length} 项库存`)
+    await ElMessageBox.confirm(
+      `确认对季度 ${form.quarter} 创建库存快照？\n将冻结当前所有小件的账面库存、货架号和类型。`,
+      '发起季度盘点',
+      { confirmButtonText: '确认创建', cancelButtonText: '取消', type: 'warning' }
+    )
+    snapshotLoading.value = true
+    const res = await initiateStockCheckSnapshot({ quarter: form.quarter })
+    const vo = res.data
+    snapshotInfo.totalCount = vo.totalCount
+    snapshotInfo.pinCount = vo.pinCount
+    snapshotInfo.shimCount = vo.shimCount
+    snapshotItems.value = vo.items
+    snapshotReady.value = true
+    ElMessage.success(`快照创建成功：共 ${vo.totalCount} 项（顶针${vo.pinCount} / 垫片${vo.shimCount}）`)
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+    }
+  } finally {
+    snapshotLoading.value = false
+  }
+}
+
+const loadFromSnapshot = async () => {
+  if (!form.quarter.trim()) {
+    ElMessage.warning('请先输入盘点季度')
+    return
+  }
+  try {
+    snapshotLoading.value = true
+    const res = await getStockCheckSnapshot({ quarter: form.quarter })
+    const vo = res.data
+    if (!vo.items || vo.items.length === 0) {
+      ElMessage.warning('该季度尚未创建快照，请先点击"发起季度盘点"')
+      snapshotReady.value = false
+      return
+    }
+    snapshotInfo.totalCount = vo.totalCount
+    snapshotInfo.pinCount = vo.pinCount
+    snapshotInfo.shimCount = vo.shimCount
+    snapshotItems.value = vo.items
+    snapshotReady.value = true
+    form.items = vo.items
+      .filter(p => p.frozenStockQuantity > 0)
+      .map(p => ({
+        partId: p.partId,
+        actualQuantity: p.frozenStockQuantity,
+        remark: ''
+      }))
+    ElMessage.success(`已从快照载入 ${form.items.length} 项库存`)
   } catch (e) {
     console.error(e)
+  } finally {
+    snapshotLoading.value = false
   }
 }
 
@@ -271,7 +427,7 @@ const loadPartList = async () => {
     const res = await getPartList()
     partList.value = res.data
     columns[0].options = res.data.map(p => ({
-      label: `${p.partModel} - ${p.partName} (系统库存:${p.stockQuantity})`,
+      label: `${p.partModel} - ${p.partName}`,
       value: p.id
     }))
   } catch (e) {
@@ -290,6 +446,10 @@ const submit = async () => {
   }
   if (!form.checkPerson.trim()) {
     ElMessage.warning('请输入盘点人姓名')
+    return
+  }
+  if (!snapshotReady.value) {
+    ElMessage.warning('请先发起季度盘点创建快照')
     return
   }
 
@@ -346,6 +506,11 @@ const resetForm = () => {
   form.quarter = ''
   form.checkPerson = ''
   form.items = []
+  snapshotReady.value = false
+  snapshotItems.value = []
+  snapshotInfo.totalCount = 0
+  snapshotInfo.pinCount = 0
+  snapshotInfo.shimCount = 0
 }
 
 const loadRecords = async () => {
@@ -356,6 +521,7 @@ const loadRecords = async () => {
       pageSize: recordPage.pageSize,
       partModel: searchForm.partModel || undefined,
       quarter: searchForm.quarter || undefined,
+      confirmStatus: searchForm.confirmStatus !== null && searchForm.confirmStatus !== undefined ? searchForm.confirmStatus : undefined,
       startTime: searchForm.dateRange?.[0] ? `${searchForm.dateRange[0]} 00:00:00` : undefined,
       endTime: searchForm.dateRange?.[1] ? `${searchForm.dateRange[1]} 23:59:59` : undefined
     })
@@ -365,6 +531,39 @@ const loadRecords = async () => {
     console.error(e)
   } finally {
     loading.value = false
+  }
+}
+
+const openConfirmDialog = (row) => {
+  Object.assign(confirmRow, row)
+  confirmForm.handleConclusion = ''
+  confirmForm.confirmPerson = ''
+  confirmDialogVisible.value = true
+}
+
+const submitConfirm = async () => {
+  if (!confirmForm.handleConclusion.trim()) {
+    ElMessage.warning('请填写处理结论')
+    return
+  }
+  if (!confirmForm.confirmPerson.trim()) {
+    ElMessage.warning('请输入确认人')
+    return
+  }
+  try {
+    confirmSubmitting.value = true
+    await confirmStockCheckDiff({
+      recordId: confirmRow.id,
+      handleConclusion: confirmForm.handleConclusion,
+      confirmPerson: confirmForm.confirmPerson
+    })
+    ElMessage.success('差异确认成功，已闭环')
+    confirmDialogVisible.value = false
+    loadRecords()
+  } catch (e) {
+    console.error(e)
+  } finally {
+    confirmSubmitting.value = false
   }
 }
 

@@ -3,12 +3,18 @@ package com.inventory.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.inventory.dto.DiffConfirmDTO;
+import com.inventory.dto.SnapshotInitiateDTO;
+import com.inventory.dto.SnapshotVO;
 import com.inventory.dto.StockCheckDTO;
 import com.inventory.dto.StockCheckHotZoneVO;
 import com.inventory.dto.StockCheckResultVO;
 import com.inventory.entity.SmallPart;
 import com.inventory.entity.StockCheckRecord;
+import com.inventory.entity.StockCheckSnapshot;
+import com.inventory.exception.BusinessException;
 import com.inventory.mapper.StockCheckRecordMapper;
+import com.inventory.mapper.StockCheckSnapshotMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,12 +34,14 @@ import java.util.stream.Collectors;
 public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, StockCheckRecord> {
 
     private final StockCheckRecordMapper stockCheckRecordMapper;
+    private final StockCheckSnapshotMapper stockCheckSnapshotMapper;
     private final SmallPartService smallPartService;
 
     public IPage<StockCheckRecord> getPageList(Integer pageNum, Integer pageSize, String partModel,
-                                                String quarter, String startTime, String endTime) {
+                                                String quarter, String startTime, String endTime,
+                                                Integer confirmStatus) {
         Page<StockCheckRecord> page = new Page<>(pageNum, pageSize);
-        return stockCheckRecordMapper.selectPageList(page, partModel, quarter, startTime, endTime);
+        return stockCheckRecordMapper.selectPageList(page, partModel, quarter, startTime, endTime, confirmStatus);
     }
 
     public StockCheckHotZoneVO getHotZone(String quarter) {
@@ -96,6 +104,64 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public SnapshotVO initiateSnapshot(SnapshotInitiateDTO dto) {
+        String quarter = dto.getQuarter();
+        List<StockCheckSnapshot> existing = stockCheckSnapshotMapper.selectByQuarter(quarter);
+        if (!existing.isEmpty()) {
+            log.info("季度 {} 已存在 {} 条快照，重新生成快照", quarter, existing.size());
+            stockCheckSnapshotMapper.deleteByQuarter(quarter);
+        }
+
+        List<SmallPart> allParts = smallPartService.listAll();
+        List<StockCheckSnapshot> snapshots = new ArrayList<>();
+        LocalDateTime now = LocalDateTime.now();
+
+        for (SmallPart part : allParts) {
+            StockCheckSnapshot snapshot = new StockCheckSnapshot();
+            snapshot.setQuarter(quarter);
+            snapshot.setPartId(part.getId());
+            snapshot.setPartModel(part.getPartModel());
+            snapshot.setPartName(part.getPartName());
+            snapshot.setPartType(part.getPartType());
+            snapshot.setFrozenStockQuantity(part.getStockQuantity());
+            snapshot.setFrozenShelfNo(part.getShelfNo());
+            snapshot.setCreateTime(now);
+            snapshots.add(snapshot);
+        }
+
+        if (!snapshots.isEmpty()) {
+            saveBatchSnapshot(snapshots);
+        }
+
+        SnapshotVO vo = new SnapshotVO();
+        vo.setQuarter(quarter);
+        vo.setTotalCount(snapshots.size());
+        vo.setPinCount((int) snapshots.stream().filter(s -> "顶针".equals(s.getPartType())).count());
+        vo.setShimCount((int) snapshots.stream().filter(s -> "限位垫片".equals(s.getPartType())).count());
+        vo.setItems(snapshots);
+        log.info("季度盘点快照创建成功：季度={}，共 {} 条记录（顶针{}，垫片{}）",
+                quarter, vo.getTotalCount(), vo.getPinCount(), vo.getShimCount());
+        return vo;
+    }
+
+    private void saveBatchSnapshot(List<StockCheckSnapshot> snapshots) {
+        for (StockCheckSnapshot snapshot : snapshots) {
+            stockCheckSnapshotMapper.insert(snapshot);
+        }
+    }
+
+    public SnapshotVO getSnapshot(String quarter) {
+        List<StockCheckSnapshot> snapshots = stockCheckSnapshotMapper.selectByQuarter(quarter);
+        SnapshotVO vo = new SnapshotVO();
+        vo.setQuarter(quarter);
+        vo.setTotalCount(snapshots.size());
+        vo.setPinCount((int) snapshots.stream().filter(s -> "顶针".equals(s.getPartType())).count());
+        vo.setShimCount((int) snapshots.stream().filter(s -> "限位垫片".equals(s.getPartType())).count());
+        vo.setItems(snapshots);
+        return vo;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public StockCheckResultVO checkStock(StockCheckDTO dto) {
         StockCheckResultVO result = new StockCheckResultVO();
         List<StockCheckRecord> addedRecords = new ArrayList<>();
@@ -105,12 +171,20 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
                 .map(StockCheckDTO.StockCheckItem::getPartId)
                 .collect(Collectors.toList());
 
-        List<SmallPart> parts = smallPartService.listByIds(partIds);
-        Map<Long, SmallPart> partMap = parts.stream()
-                .collect(Collectors.toMap(SmallPart::getId, p -> p));
+        Map<Long, StockCheckSnapshot> snapshotMap = new LinkedHashMap<>();
+        for (Long partId : partIds) {
+            StockCheckSnapshot snapshot = stockCheckSnapshotMapper.selectByQuarterAndPartId(dto.getQuarter(), partId);
+            if (snapshot != null) {
+                snapshotMap.put(partId, snapshot);
+            }
+        }
 
-        List<String> partModels = parts.stream()
-                .map(SmallPart::getPartModel)
+        if (snapshotMap.isEmpty()) {
+            throw new BusinessException("该季度尚未创建盘点快照，请先发起盘点初始化");
+        }
+
+        List<String> partModels = snapshotMap.values().stream()
+                .map(StockCheckSnapshot::getPartModel)
                 .collect(Collectors.toList());
 
         List<StockCheckRecord> existingRecords = stockCheckRecordMapper
@@ -124,44 +198,73 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
                 .collect(Collectors.toMap(StockCheckRecord::getPartModel, r -> r));
 
         for (StockCheckDTO.StockCheckItem item : dto.getItems()) {
-            SmallPart part = partMap.get(item.getPartId());
-            if (part == null) {
+            StockCheckSnapshot snapshot = snapshotMap.get(item.getPartId());
+            if (snapshot == null) {
                 continue;
             }
 
-            if (existingModelSet.contains(part.getPartModel())) {
-                duplicateRecords.add(existingRecordMap.get(part.getPartModel()));
+            if (existingModelSet.contains(snapshot.getPartModel())) {
+                duplicateRecords.add(existingRecordMap.get(snapshot.getPartModel()));
                 continue;
             }
 
-            int systemQuantity = part.getStockQuantity();
+            int systemQuantity = snapshot.getFrozenStockQuantity();
             int actualQuantity = item.getActualQuantity();
             int diffQuantity = actualQuantity - systemQuantity;
 
             StockCheckRecord record = new StockCheckRecord();
-            record.setPartId(part.getId());
-            record.setPartModel(part.getPartModel());
+            record.setPartId(snapshot.getPartId());
+            record.setPartModel(snapshot.getPartModel());
             record.setSystemQuantity(systemQuantity);
             record.setActualQuantity(actualQuantity);
             record.setDiffQuantity(diffQuantity);
-            record.setShelfNo(part.getShelfNo());
+            record.setShelfNo(snapshot.getFrozenShelfNo());
             record.setCheckPerson(dto.getCheckPerson());
             record.setRemark(item.getRemark());
             record.setQuarter(dto.getQuarter());
+            record.setSnapshotId(snapshot.getId());
+            record.setConfirmStatus(diffQuantity == 0 ? 1 : 0);
             record.setCreateTime(LocalDateTime.now());
             save(record);
             addedRecords.add(record);
 
             if (diffQuantity != 0) {
-                log.warn("库存差异: 型号={}, 系统库存={}, 实际库存={}, 差异={}",
-                        part.getPartModel(), systemQuantity, actualQuantity, diffQuantity);
+                log.warn("库存差异(基于快照): 型号={}, 快照库存={}, 实际库存={}, 差异={}",
+                        snapshot.getPartModel(), systemQuantity, actualQuantity, diffQuantity);
             } else {
-                log.info("盘点一致: 型号={}, 库存数量={}", part.getPartModel(), actualQuantity);
+                log.info("盘点一致(基于快照): 型号={}, 库存数量={}", snapshot.getPartModel(), actualQuantity);
             }
         }
 
         result.setAddedRecords(addedRecords);
         result.setDuplicateRecords(duplicateRecords);
         return result;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void confirmDiff(DiffConfirmDTO dto) {
+        StockCheckRecord record = getById(dto.getRecordId());
+        if (record == null) {
+            throw new BusinessException("盘点记录不存在");
+        }
+        if (record.getDiffQuantity() == null || record.getDiffQuantity() == 0) {
+            throw new BusinessException("该记录无差异，无需确认");
+        }
+        if (record.getConfirmStatus() != null && record.getConfirmStatus() == 1) {
+            throw new BusinessException("该差异已确认闭环，不可重复操作");
+        }
+
+        int rows = stockCheckRecordMapper.updateConfirm(
+                dto.getRecordId(),
+                dto.getHandleConclusion(),
+                dto.getConfirmPerson(),
+                LocalDateTime.now()
+        );
+        if (rows != 1) {
+            throw new BusinessException("差异确认失败");
+        }
+        log.info("盘点差异确认成功：记录ID={}, 型号={}, 差异={}, 确认人={}, 处理结论={}",
+                record.getId(), record.getPartModel(), record.getDiffQuantity(),
+                dto.getConfirmPerson(), dto.getHandleConclusion());
     }
 }
