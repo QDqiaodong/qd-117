@@ -226,7 +226,7 @@ const validateCell = (rowIndex, prop) => {
   if (validator) {
     const value = tableData.value[rowIndex][prop]
     const row = tableData.value[rowIndex]
-    const result = validator(value, row, rowIndex)
+    const result = validator(value, row, rowIndex, tableData.value)
     if (result && !result.valid) {
       if (!rowErrors[rowIndex]) rowErrors[rowIndex] = {}
       rowErrors[rowIndex][prop] = result.message

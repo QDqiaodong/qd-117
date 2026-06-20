@@ -205,13 +205,24 @@ const validators = {
     }
     return { valid: true }
   },
-  quantity: (value, row) => {
+  quantity: (value, row, rowIndex, allRows) => {
     if (value === null || value === undefined || value <= 0) {
       return { valid: false, message: '数量必须大于0' }
     }
     const part = partList.value.find(p => p.id === row.partId)
-    if (part && value > part.stockQuantity) {
-      return { valid: false, message: `库存不足(当前:${part.stockQuantity})` }
+    if (part) {
+      if (allRows) {
+        const totalQty = allRows
+          .filter(r => r.partId === row.partId && r.quantity > 0)
+          .reduce((sum, r) => sum + r.quantity, 0)
+        if (totalQty > part.stockQuantity) {
+          return { valid: false, message: `库存不足，合计需${totalQty}(当前:${part.stockQuantity})` }
+        }
+      } else {
+        if (value > part.stockQuantity) {
+          return { valid: false, message: `库存不足(当前:${part.stockQuantity})` }
+        }
+      }
     }
     return { valid: true }
   },

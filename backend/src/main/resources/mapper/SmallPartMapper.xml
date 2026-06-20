@@ -30,4 +30,19 @@
         ORDER BY create_time DESC
     </select>
 
+    <update id="decreaseStockAtomic">
+        UPDATE small_part
+        SET stock_quantity = stock_quantity - #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND stock_quantity >= #{quantity}
+    </update>
+
+    <update id="increaseStockAtomic">
+        UPDATE small_part
+        SET stock_quantity = stock_quantity + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
 </mapper>

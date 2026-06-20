@@ -119,15 +119,14 @@ public class ShelfCapacityService extends ServiceImpl<ShelfCapacityMapper, Shelf
             log.warn("货架 {} 未配置容量限制，跳过容量校验", shelfNo);
             return;
         }
-        if (!capacity.canAddPinBoxes(quantity)) {
+        int rows = shelfCapacityMapper.increasePinBoxesAtomic(capacity.getId(), quantity);
+        if (rows != 1) {
+            ShelfCapacity current = getByShelfNo(shelfNo);
             throw new BusinessException("货架 [" + shelfNo + "] 顶针存放数量已达上限，当前: "
-                    + capacity.getCurrentPinBoxes() + "，上限: " + capacity.getMaxPinBoxes()
-                    + "，剩余容量: " + capacity.getRemainingPinBoxes());
+                    + current.getCurrentPinBoxes() + "，上限: " + current.getMaxPinBoxes()
+                    + "，剩余容量: " + current.getRemainingPinBoxes());
         }
-        capacity.setCurrentPinBoxes(capacity.getCurrentPinBoxes() + quantity);
-        capacity.setUpdateTime(LocalDateTime.now());
-        updateById(capacity);
-        log.info("货架 {} 顶针盒数 +{}，当前: {}", shelfNo, quantity, capacity.getCurrentPinBoxes());
+        log.info("货架 {} 顶针盒数 +{}", shelfNo, quantity);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -137,15 +136,14 @@ public class ShelfCapacityService extends ServiceImpl<ShelfCapacityMapper, Shelf
             log.warn("货架 {} 未配置容量限制，跳过容量校验", shelfNo);
             return;
         }
-        if (!capacity.canAddShimPacks(quantity)) {
+        int rows = shelfCapacityMapper.increaseShimPacksAtomic(capacity.getId(), quantity);
+        if (rows != 1) {
+            ShelfCapacity current = getByShelfNo(shelfNo);
             throw new BusinessException("货架 [" + shelfNo + "] 垫片存放数量已达上限，当前: "
-                    + capacity.getCurrentShimPacks() + "，上限: " + capacity.getMaxShimPacks()
-                    + "，剩余容量: " + capacity.getRemainingShimPacks());
+                    + current.getCurrentShimPacks() + "，上限: " + current.getMaxShimPacks()
+                    + "，剩余容量: " + current.getRemainingShimPacks());
         }
-        capacity.setCurrentShimPacks(capacity.getCurrentShimPacks() + quantity);
-        capacity.setUpdateTime(LocalDateTime.now());
-        updateById(capacity);
-        log.info("货架 {} 垫片包数 +{}，当前: {}", shelfNo, quantity, capacity.getCurrentShimPacks());
+        log.info("货架 {} 垫片包数 +{}", shelfNo, quantity);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -154,12 +152,8 @@ public class ShelfCapacityService extends ServiceImpl<ShelfCapacityMapper, Shelf
         if (capacity == null) {
             return;
         }
-        int current = capacity.getCurrentPinBoxes() == null ? 0 : capacity.getCurrentPinBoxes();
-        int newValue = Math.max(0, current - quantity);
-        capacity.setCurrentPinBoxes(newValue);
-        capacity.setUpdateTime(LocalDateTime.now());
-        updateById(capacity);
-        log.info("货架 {} 顶针盒数 -{}，当前: {}", shelfNo, quantity, newValue);
+        shelfCapacityMapper.decreasePinBoxesAtomic(capacity.getId(), quantity);
+        log.info("货架 {} 顶针盒数 -{}", shelfNo, quantity);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -168,12 +162,8 @@ public class ShelfCapacityService extends ServiceImpl<ShelfCapacityMapper, Shelf
         if (capacity == null) {
             return;
         }
-        int current = capacity.getCurrentShimPacks() == null ? 0 : capacity.getCurrentShimPacks();
-        int newValue = Math.max(0, current - quantity);
-        capacity.setCurrentShimPacks(newValue);
-        capacity.setUpdateTime(LocalDateTime.now());
-        updateById(capacity);
-        log.info("货架 {} 垫片包数 -{}，当前: {}", shelfNo, quantity, newValue);
+        shelfCapacityMapper.decreaseShimPacksAtomic(capacity.getId(), quantity);
+        log.info("货架 {} 垫片包数 -{}", shelfNo, quantity);
     }
 
     public StockInValidationVO validateStockIn(StockInDTO dto) {

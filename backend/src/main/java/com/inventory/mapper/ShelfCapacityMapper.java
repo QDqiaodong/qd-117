@@ -12,4 +12,12 @@ public interface ShelfCapacityMapper extends BaseMapper<ShelfCapacity> {
 
     IPage<ShelfCapacity> selectPageList(Page<ShelfCapacity> page,
                                         @Param("shelfNo") String shelfNo);
+
+    int increasePinBoxesAtomic(@Param("id") Long id, @Param("quantity") int quantity);
+
+    int increaseShimPacksAtomic(@Param("id") Long id, @Param("quantity") int quantity);
+
+    int decreasePinBoxesAtomic(@Param("id") Long id, @Param("quantity") int quantity);
+
+    int decreaseShimPacksAtomic(@Param("id") Long id, @Param("quantity") int quantity);
 }

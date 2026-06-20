@@ -24,4 +24,34 @@
         ORDER BY create_time DESC
     </select>
 
+    <update id="increasePinBoxesAtomic">
+        UPDATE shelf_capacity
+        SET current_pin_boxes = current_pin_boxes + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND max_pin_boxes >= current_pin_boxes + #{quantity}
+    </update>
+
+    <update id="increaseShimPacksAtomic">
+        UPDATE shelf_capacity
+        SET current_shim_packs = current_shim_packs + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND max_shim_packs >= current_shim_packs + #{quantity}
+    </update>
+
+    <update id="decreasePinBoxesAtomic">
+        UPDATE shelf_capacity
+        SET current_pin_boxes = GREATEST(0, current_pin_boxes - #{quantity}),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <update id="decreaseShimPacksAtomic">
+        UPDATE shelf_capacity
+        SET current_shim_packs = GREATEST(0, current_shim_packs - #{quantity}),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
 </mapper>

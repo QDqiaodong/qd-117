@@ -15,7 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -36,17 +38,23 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
     public List<StockOutRecord> stockOut(StockOutDTO dto) {
         List<StockOutRecord> records = new ArrayList<>();
 
+        Map<Long, Integer> partTotalQtyMap = new HashMap<>();
         for (StockOutDTO.StockOutItem item : dto.getItems()) {
-            SmallPart part = smallPartService.getById(item.getPartId());
-            if (part.getStockQuantity() < item.getQuantity()) {
+            partTotalQtyMap.merge(item.getPartId(), item.getQuantity(), Integer::sum);
+        }
+
+        for (Map.Entry<Long, Integer> entry : partTotalQtyMap.entrySet()) {
+            SmallPart part = smallPartService.getById(entry.getKey());
+            if (part.getStockQuantity() < entry.getValue()) {
                 throw new BusinessException("库存不足: " + part.getPartModel() +
                         ", 当前库存: " + part.getStockQuantity() +
-                        ", 申请数量: " + item.getQuantity());
+                        ", 申请合计: " + entry.getValue());
             }
         }
 
+        Map<Long, SmallPart> partCache = new HashMap<>();
         for (StockOutDTO.StockOutItem item : dto.getItems()) {
-            SmallPart part = smallPartService.getById(item.getPartId());
+            SmallPart part = partCache.computeIfAbsent(item.getPartId(), smallPartService::getById);
 
             smallPartService.decreaseStock(part.getId(), item.getQuantity());
 

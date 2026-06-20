@@ -100,25 +100,27 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
 
     @Transactional(rollbackFor = Exception.class)
     public void increaseStock(Long id, Integer quantity) {
-        SmallPart part = getById(id);
-        part.setStockQuantity(part.getStockQuantity() + quantity);
-        part.setUpdateTime(LocalDateTime.now());
-        updateById(part);
-        SmallPart updated = getById(id);
-        partSpecCache.updatePartSpec(part, updated);
+        SmallPart before = getById(id);
+        int rows = smallPartMapper.increaseStockAtomic(id, quantity);
+        if (rows != 1) {
+            throw new BusinessException("库存增加失败: " + before.getPartModel());
+        }
+        SmallPart after = getById(id);
+        partSpecCache.updatePartSpec(before, after);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void decreaseStock(Long id, Integer quantity) {
-        SmallPart part = getById(id);
-        if (part.getStockQuantity() < quantity) {
-            throw new BusinessException("库存不足: " + part.getPartModel() + ", 当前库存: " + part.getStockQuantity());
+        SmallPart before = getById(id);
+        int rows = smallPartMapper.decreaseStockAtomic(id, quantity);
+        if (rows != 1) {
+            SmallPart current = getById(id);
+            throw new BusinessException("库存不足: " + current.getPartModel() +
+                    ", 当前库存: " + current.getStockQuantity() +
+                    ", 扣减数量: " + quantity);
         }
-        part.setStockQuantity(part.getStockQuantity() - quantity);
-        part.setUpdateTime(LocalDateTime.now());
-        updateById(part);
-        SmallPart updated = getById(id);
-        partSpecCache.updatePartSpec(part, updated);
+        SmallPart after = getById(id);
+        partSpecCache.updatePartSpec(before, after);
     }
 
     public List<SmallPart> listAll() {
