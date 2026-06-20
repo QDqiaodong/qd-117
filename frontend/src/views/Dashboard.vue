@@ -70,7 +70,46 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="specParams" label="规格参数" min-width="180" show-overflow-tooltip />
+      <el-table-column label="规格参数" min-width="200">
+        <template #default="{ row }">
+          <el-tooltip
+            :disabled="!row.specParams"
+            placement="top"
+            effect="dark"
+            :show-after="300"
+          >
+            <template #content>
+              <div class="spec-tooltip">
+                <div class="spec-tooltip-title">完整规格参数</div>
+                <pre class="spec-tooltip-json">{{ formatTooltipJson(row.specParams) }}</pre>
+              </div>
+            </template>
+            <div class="spec-display">
+              <template v-if="row.partType === '顶针'">
+                <el-tag v-if="getSpecValue(row, ['diameter', '直径', 'Diameter', 'D'])" type="primary" size="small" effect="plain" class="spec-tag">
+                  直径 {{ getSpecValue(row, ['diameter', '直径', 'Diameter', 'D']) }}
+                </el-tag>
+                <el-tag v-if="getSpecValue(row, ['length', '长度', 'Length', 'L'])" type="primary" size="small" effect="plain" class="spec-tag">
+                  长度 {{ getSpecValue(row, ['length', '长度', 'Length', 'L']) }}
+                </el-tag>
+                <span v-if="!hasPinSpecs(row)" class="spec-raw">{{ row.specParams || '-' }}</span>
+              </template>
+              <template v-else-if="row.partType === '限位垫片'">
+                <el-tag v-if="getSpecValue(row, ['thickness', '厚度', 'Thickness', 'T'])" type="success" size="small" effect="plain" class="spec-tag">
+                  厚度 {{ getSpecValue(row, ['thickness', '厚度', 'Thickness', 'T']) }}
+                </el-tag>
+                <el-tag v-if="getSpecValue(row, ['innerDiameter', '孔径', 'InnerDiameter', 'ID', '内直径', 'holeDiameter', 'hole'])" type="success" size="small" effect="plain" class="spec-tag">
+                  孔径 {{ getSpecValue(row, ['innerDiameter', '孔径', 'InnerDiameter', 'ID', '内直径', 'holeDiameter', 'hole']) }}
+                </el-tag>
+                <span v-if="!hasShimSpecs(row)" class="spec-raw">{{ row.specParams || '-' }}</span>
+              </template>
+              <template v-else>
+                <span class="spec-raw">{{ row.specParams || '-' }}</span>
+              </template>
+            </div>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
       <el-table-column prop="stockQuantity" label="库存数量" width="100" align="center">
         <template #default="{ row }">
@@ -167,5 +206,114 @@ const refreshCache = async () => {
   }
 }
 
+const tryParseJson = (text) => {
+  if (!text) return null
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+const stripToNumber = (text) => {
+  if (!text) return null
+  const match = text.match(/(\d+(?:\.\d+)?)/)
+  return match ? match[1] : (text.trim() ? text.trim() : null)
+}
+
+const getSpecValue = (row, keys) => {
+  if (!row || !row.specParams) return null
+  const json = tryParseJson(row.specParams)
+  if (json) {
+    for (const key of keys) {
+      const value = json[key]
+      if (value !== null && value !== undefined && String(value).trim() !== '') {
+        const numVal = stripToNumber(String(value))
+        if (numVal) return numVal
+      }
+    }
+  }
+  const raw = row.specParams
+  for (const key of keys) {
+    const pattern = new RegExp(key + '\\s*[:：]?\\s*(\\d+(?:\\.\\d+)?)')
+    const match = raw.match(pattern)
+    if (match) {
+      return match[1]
+    }
+  }
+  return null
+}
+
+const hasPinSpecs = (row) => {
+  const diameter = getSpecValue(row, ['diameter', '直径', 'Diameter', 'D'])
+  const length = getSpecValue(row, ['length', '长度', 'Length', 'L'])
+  return !!(diameter || length)
+}
+
+const hasShimSpecs = (row) => {
+  const thickness = getSpecValue(row, ['thickness', '厚度', 'Thickness', 'T'])
+  const hole = getSpecValue(row, ['innerDiameter', '孔径', 'InnerDiameter', 'ID', '内直径', 'holeDiameter', 'hole'])
+  return !!(thickness || hole)
+}
+
+const formatTooltipJson = (text) => {
+  if (!text) return '（无规格参数）'
+  const json = tryParseJson(text)
+  if (json) {
+    return JSON.stringify(json, null, 2)
+  }
+  return text
+}
+
 onMounted(loadData)
 </script>
+
+<style lang="scss" scoped>
+.spec-display {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.6;
+
+  .spec-tag {
+    border-radius: 4px;
+    font-weight: 500;
+  }
+
+  .spec-raw {
+    color: #606266;
+    font-size: 13px;
+  }
+}
+</style>
+
+<style lang="scss">
+.spec-tooltip {
+  max-width: 420px;
+
+  .spec-tooltip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .spec-tooltip-json {
+    margin: 0;
+    padding: 0;
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', Consolas, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #e6e6e6;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+}
+</style>
