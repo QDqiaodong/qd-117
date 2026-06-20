@@ -56,7 +56,7 @@ public class StockCheckController {
     @PostMapping("/diff/confirm")
     public Result<Void> confirmDiff(@Valid @RequestBody DiffConfirmDTO dto) {
         stockCheckService.confirmDiff(dto);
-        return Result.success("差异确认成功");
+        return Result.success("差异确认成功", null);
     }
 
     @GetMapping("/hot-zone")
