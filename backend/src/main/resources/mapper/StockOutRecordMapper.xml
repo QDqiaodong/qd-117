@@ -17,20 +17,20 @@
     <select id="selectPageList" resultMap="BaseResultMap">
         SELECT * FROM stock_out_record
         <where>
-            <if test="partModel != null and partModel != ''">
-                AND part_model LIKE CONCAT('%', #{partModel}, '%')
-            </if>
-            <if test="productionLine != null and productionLine != ''">
-                AND production_line = #{productionLine}
-            </if>
             <if test="startTime != null and startTime != ''">
                 AND create_time >= #{startTime}
             </if>
             <if test="endTime != null and endTime != ''">
                 AND create_time &lt;= #{endTime}
             </if>
+            <if test="partModel != null and partModel != ''">
+                AND part_model LIKE CONCAT(#{partModel}, '%')
+            </if>
+            <if test="productionLine != null and productionLine != ''">
+                AND production_line = #{productionLine}
+            </if>
         </where>
-        ORDER BY create_time DESC
+        ORDER BY create_time DESC, id DESC
     </select>
 
 </mapper>

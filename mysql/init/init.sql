@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS stock_in_record (
     remark VARCHAR(500) COMMENT '备注',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
-    INDEX idx_create_time (create_time)
+    INDEX idx_create_time (create_time),
+    INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='入库记录表';
 
 CREATE TABLE IF NOT EXISTS stock_out_record (
@@ -37,7 +38,8 @@ CREATE TABLE IF NOT EXISTS stock_out_record (
     remark VARCHAR(500) COMMENT '备注',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
-    INDEX idx_create_time (create_time)
+    INDEX idx_create_time (create_time),
+    INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='出库领用记录表';
 
 CREATE TABLE IF NOT EXISTS stock_check_record (
@@ -53,7 +55,8 @@ CREATE TABLE IF NOT EXISTS stock_check_record (
     quarter VARCHAR(20) NOT NULL COMMENT '盘点季度：2024-Q1',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
-    INDEX idx_quarter (quarter)
+    INDEX idx_quarter (quarter),
+    INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存盘点记录表';
 
 CREATE TABLE IF NOT EXISTS scrap_record (
@@ -66,5 +69,6 @@ CREATE TABLE IF NOT EXISTS scrap_record (
     remark VARCHAR(500) COMMENT '备注',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
-    INDEX idx_create_time (create_time)
+    INDEX idx_create_time (create_time),
+    INDEX idx_part_model_create_time (part_model, create_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='报废记录表';

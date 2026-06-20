@@ -3,10 +3,42 @@
     <h2 class="page-title">流水记录查询</h2>
 
     <el-tabs v-model="activeTab" @tab-change="onTabChange">
-      <el-tab-pane label="入库记录" name="in" />
-      <el-tab-pane label="出库记录" name="out" />
-      <el-tab-pane label="盘点记录" name="check" />
-      <el-tab-pane label="报废记录" name="scrap" />
+      <el-tab-pane name="in">
+        <template #label>
+          <span class="tab-label">
+            <span class="tab-ribbon ribbon-in"></span>
+            <span class="tab-icon icon-in">+</span>
+            入库记录
+          </span>
+        </template>
+      </el-tab-pane>
+      <el-tab-pane name="out">
+        <template #label>
+          <span class="tab-label">
+            <span class="tab-ribbon ribbon-out"></span>
+            <span class="tab-icon icon-out">−</span>
+            出库记录
+          </span>
+        </template>
+      </el-tab-pane>
+      <el-tab-pane name="check">
+        <template #label>
+          <span class="tab-label">
+            <span class="tab-ribbon ribbon-check"></span>
+            <span class="tab-icon icon-check">≈</span>
+            盘点记录
+          </span>
+        </template>
+      </el-tab-pane>
+      <el-tab-pane name="scrap">
+        <template #label>
+          <span class="tab-label">
+            <span class="tab-ribbon ribbon-scrap"></span>
+            <span class="tab-icon icon-scrap">−</span>
+            报废记录
+          </span>
+        </template>
+      </el-tab-pane>
     </el-tabs>
 
     <div class="toolbar">
@@ -69,7 +101,11 @@
     <template v-if="activeTab === 'in'">
       <el-table :data="tableData" stripe border v-loading="loading" style="width: 100%;">
         <el-table-column prop="partModel" label="零件型号" min-width="140" />
-        <el-table-column prop="quantity" label="入库数量" width="100" align="center" />
+        <el-table-column prop="quantity" label="入库数量" width="120" align="center">
+          <template #default="{ row }">
+            <span class="qty-increase">+{{ row.quantity }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
         <el-table-column prop="operator" label="操作人" width="100" align="center" />
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
@@ -80,7 +116,11 @@
     <template v-if="activeTab === 'out'">
       <el-table :data="tableData" stripe border v-loading="loading" style="width: 100%;">
         <el-table-column prop="partModel" label="零件型号" min-width="140" />
-        <el-table-column prop="quantity" label="领用数量" width="100" align="center" />
+        <el-table-column prop="quantity" label="领用数量" width="120" align="center">
+          <template #default="{ row }">
+            <span class="qty-decrease">−{{ row.quantity }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="productionLine" label="领用产线" width="120" align="center" />
         <el-table-column prop="operator" label="操作人" width="100" align="center" />
         <el-table-column prop="receiver" label="领用人" width="100" align="center" />
@@ -112,7 +152,11 @@
     <template v-if="activeTab === 'scrap'">
       <el-table :data="tableData" stripe border v-loading="loading" style="width: 100%;">
         <el-table-column prop="partModel" label="零件型号" min-width="140" />
-        <el-table-column prop="quantity" label="报废数量" width="100" align="center" />
+        <el-table-column prop="quantity" label="报废数量" width="120" align="center">
+          <template #default="{ row }">
+            <span class="qty-decrease">−{{ row.quantity }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="scrapReason" label="报废原因" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.scrapReason === '断裂' ? 'danger' : (row.scrapReason === '变形' ? 'warning' : 'info')">
@@ -214,3 +258,68 @@ const loadData = async () => {
 
 onMounted(loadData)
 </script>
+
+<style lang="scss" scoped>
+.tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tab-ribbon {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  display: inline-block;
+
+  &.ribbon-in {
+    background: #67c23a;
+  }
+
+  &.ribbon-out {
+    background: #f56c6c;
+  }
+
+  &.ribbon-check {
+    background: #409eff;
+  }
+
+  &.ribbon-scrap {
+    background: #e6a23c;
+  }
+}
+
+.tab-icon {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+
+  &.icon-in {
+    color: #67c23a;
+  }
+
+  &.icon-out {
+    color: #f56c6c;
+  }
+
+  &.icon-check {
+    color: #409eff;
+  }
+
+  &.icon-scrap {
+    color: #e6a23c;
+  }
+}
+
+.qty-increase {
+  color: #67c23a;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.qty-decrease {
+  color: #f56c6c;
+  font-weight: 600;
+  font-size: 15px;
+}
+</style>
