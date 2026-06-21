@@ -39,9 +39,18 @@ public class ScrapService extends ServiceImpl<ScrapRecordMapper, ScrapRecord> {
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
             throw new BusinessException("报废明细不能为空");
         }
+        if (dto.getOperator() != null) {
+            dto.setOperator(dto.getOperator().trim());
+        }
+        if (dto.getRemark() != null) {
+            dto.setRemark(dto.getRemark().trim());
+        }
         for (ScrapDTO.ScrapItem item : dto.getItems()) {
             if (item.getQuantity() == null || item.getQuantity() <= 0) {
                 throw new BusinessException("报废数量必须大于0，零件ID：" + item.getPartId());
+            }
+            if (item.getScrapReason() != null) {
+                item.setScrapReason(item.getScrapReason().trim());
             }
         }
 

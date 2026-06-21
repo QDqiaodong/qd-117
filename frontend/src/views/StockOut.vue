@@ -318,9 +318,9 @@ const submit = async () => {
     submitting.value = true
     await stockOut({
       productionLine: form.productionLine,
-      operator: form.operator,
-      receiver: form.receiver,
-      remark: form.remark,
+      operator: form.operator ? form.operator.trim() : form.operator,
+      receiver: form.receiver ? form.receiver.trim() : form.receiver,
+      remark: form.remark ? form.remark.trim() : form.remark,
       items: validItems
     })
     ElMessage.success('出库成功')
@@ -355,7 +355,7 @@ const loadRecords = async () => {
     const res = await getStockOutPage({
       pageNum: recordPage.pageNum,
       pageSize: recordPage.pageSize,
-      partModel: searchForm.partModel || undefined,
+      partModel: searchForm.partModel ? searchForm.partModel.trim() || undefined : undefined,
       productionLine: searchForm.productionLine || undefined,
       startTime: searchForm.dateRange?.[0] ? `${searchForm.dateRange[0]} 00:00:00` : undefined,
       endTime: searchForm.dateRange?.[1] ? `${searchForm.dateRange[1]} 23:59:59` : undefined

@@ -23,8 +23,8 @@
                 AND part_type = #{partType}
             </if>
             <if test="keyword != null and keyword != ''">
-                AND (part_model LIKE CONCAT('%', #{keyword}, '%')
-                OR part_name LIKE CONCAT('%', #{keyword}, '%'))
+                AND (TRIM(part_model) LIKE CONCAT('%', TRIM(#{keyword}), '%')
+                OR TRIM(part_name) LIKE CONCAT('%', TRIM(#{keyword}), '%'))
             </if>
         </where>
         ORDER BY create_time DESC

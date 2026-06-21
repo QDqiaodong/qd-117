@@ -53,11 +53,27 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
     }
 
     public SmallPart getByModel(String partModel) {
-        return lambdaQuery().eq(SmallPart::getPartModel, partModel).one();
+        if (partModel == null) {
+            return null;
+        }
+        String trimmedModel = partModel.trim();
+        return lambdaQuery().eq(SmallPart::getPartModel, trimmedModel).one();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public SmallPart create(SmallPart part) {
+        if (part.getPartModel() != null) {
+            part.setPartModel(part.getPartModel().trim());
+        }
+        if (part.getPartName() != null) {
+            part.setPartName(part.getPartName().trim());
+        }
+        if (part.getShelfNo() != null) {
+            part.setShelfNo(part.getShelfNo().trim());
+        }
+        if (part.getUnit() != null) {
+            part.setUnit(part.getUnit().trim());
+        }
         SmallPart existing = getByModel(part.getPartModel());
         if (existing != null) {
             throw new BusinessException("零件型号已存在: " + part.getPartModel());
@@ -78,11 +94,39 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
 
     @Transactional(rollbackFor = Exception.class)
     public SmallPart update(SmallPart part) {
+        return update(part, false, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SmallPart update(SmallPart part, boolean partTypeChanged, String oldPartType) {
         SmallPart oldPart = getById(part.getId());
+        if (part.getPartModel() != null) {
+            part.setPartModel(part.getPartModel().trim());
+        }
+        if (part.getPartName() != null) {
+            part.setPartName(part.getPartName().trim());
+        }
+        if (part.getShelfNo() != null) {
+            part.setShelfNo(part.getShelfNo().trim());
+        }
+        if (part.getUnit() != null) {
+            part.setUnit(part.getUnit().trim());
+        }
+        if (part.getRemark() != null) {
+            part.setRemark(part.getRemark().trim());
+        }
+        if (part.getSpecParams() != null) {
+            part.setSpecParams(part.getSpecParams().trim());
+        }
         part.setUpdateTime(LocalDateTime.now());
         updateById(part);
         SmallPart updated = getById(part.getId());
-        partSpecCache.updatePartSpec(oldPart, updated);
+        if (partTypeChanged && oldPartType != null) {
+            partSpecCache.removePartSpecByType(oldPart, oldPartType);
+            partSpecCache.addPartSpec(updated);
+        } else {
+            partSpecCache.updatePartSpec(oldPart, updated);
+        }
         log.info("更新小件: {}", part.getPartModel());
         return updated;
     }

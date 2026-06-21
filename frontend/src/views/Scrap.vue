@@ -293,8 +293,8 @@ const submit = async () => {
     })
     submitting.value = true
     await scrap({
-      operator: form.operator,
-      remark: form.remark,
+      operator: form.operator ? form.operator.trim() : form.operator,
+      remark: form.remark ? form.remark.trim() : form.remark,
       items: validItems
     })
     ElMessage.success('报废登记成功')
@@ -327,7 +327,7 @@ const loadRecords = async () => {
     const res = await getScrapPage({
       pageNum: recordPage.pageNum,
       pageSize: recordPage.pageSize,
-      partModel: searchForm.partModel || undefined,
+      partModel: searchForm.partModel ? searchForm.partModel.trim() || undefined : undefined,
       scrapReason: searchForm.scrapReason || undefined,
       startTime: searchForm.dateRange?.[0] ? `${searchForm.dateRange[0]} 00:00:00` : undefined,
       endTime: searchForm.dateRange?.[1] ? `${searchForm.dateRange[1]} 23:59:59` : undefined

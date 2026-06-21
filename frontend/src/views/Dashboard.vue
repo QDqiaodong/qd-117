@@ -163,7 +163,7 @@ const loadData = async () => {
     const res = await getPartPage({
       pageNum: pageNum.value,
       pageSize: pageSize.value,
-      keyword: keyword.value || undefined,
+      keyword: keyword.value ? keyword.value.trim() || undefined : undefined,
       partType: partTypeFilter.value || undefined
     })
     tableData.value = res.data.records

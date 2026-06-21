@@ -56,6 +56,17 @@ public class PartSpecCache {
         }
     }
 
+    public void removePartSpecByType(SmallPart part, String partType) {
+        try {
+            String specJson = objectMapper.writeValueAsString(buildSpecInfo(part));
+            zSetOps.remove(PART_SPECS_KEY, specJson);
+            zSetOps.remove(PART_TYPE_PREFIX + partType, specJson);
+            log.info("小件规格已从缓存移除(指定类型{}): {}", partType, part.getPartModel());
+        } catch (JsonProcessingException e) {
+            log.error("序列化小件规格失败", e);
+        }
+    }
+
     public void updatePartSpec(SmallPart oldPart, SmallPart newPart) {
         removePartSpec(oldPart);
         addPartSpec(newPart);

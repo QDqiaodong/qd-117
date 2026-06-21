@@ -40,6 +40,15 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
         if (dto.getItems() == null || dto.getItems().isEmpty()) {
             throw new BusinessException("出库明细不能为空");
         }
+        if (dto.getOperator() != null) {
+            dto.setOperator(dto.getOperator().trim());
+        }
+        if (dto.getReceiver() != null) {
+            dto.setReceiver(dto.getReceiver().trim());
+        }
+        if (dto.getRemark() != null) {
+            dto.setRemark(dto.getRemark().trim());
+        }
         for (StockOutDTO.StockOutItem item : dto.getItems()) {
             if (item.getQuantity() == null || item.getQuantity() <= 0) {
                 throw new BusinessException("出库数量必须大于0，零件ID：" + item.getPartId());

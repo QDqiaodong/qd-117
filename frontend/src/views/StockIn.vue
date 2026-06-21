@@ -207,8 +207,12 @@ const columns = [
 
 const validators = {
   partModel: (value) => {
-    if (!value || value.trim() === '') {
+    const trimmed = value ? value.trim() : ''
+    if (!trimmed) {
       return { valid: false, message: '型号不能为空' }
+    }
+    if (trimmed.length !== value.length) {
+      return { valid: false, message: '型号不能包含前后空格' }
     }
     return { valid: true }
   },
@@ -219,8 +223,12 @@ const validators = {
     return { valid: true }
   },
   shelfNo: (value) => {
-    if (!value || value.trim() === '') {
+    const trimmed = value ? value.trim() : ''
+    if (!trimmed) {
       return { valid: false, message: '货架编号不能为空' }
+    }
+    if (trimmed.length !== value.length) {
+      return { valid: false, message: '货架编号不能包含前后空格' }
     }
     return { valid: true }
   },
@@ -250,6 +258,15 @@ const submit = async () => {
   }
 
   const validItems = form.items.filter(i => i.partModel && i.partType && i.shelfNo && i.quantity > 0)
+    .map(i => ({
+      ...i,
+      partModel: i.partModel ? i.partModel.trim() : i.partModel,
+      partName: i.partName ? i.partName.trim() : i.partName,
+      specParams: i.specParams ? i.specParams.trim() : i.specParams,
+      shelfNo: i.shelfNo ? i.shelfNo.trim() : i.shelfNo,
+      unit: i.unit ? i.unit.trim() : i.unit,
+      remark: i.remark ? i.remark.trim() : i.remark
+    }))
   if (validItems.length === 0) {
     ElMessage.warning('请至少填写一行有效的入库数据')
     return
@@ -258,7 +275,7 @@ const submit = async () => {
     await ElMessageBox.confirm(`确认入库 ${validItems.length} 条记录？`, '确认')
     submitting.value = true
     await stockIn({
-      operator: form.operator,
+      operator: form.operator.trim(),
       items: validItems
     })
     ElMessage.success('入库成功')
@@ -289,7 +306,7 @@ const loadRecords = async () => {
     const res = await getStockInPage({
       pageNum: recordPage.pageNum,
       pageSize: recordPage.pageSize,
-      partModel: searchForm.partModel || undefined,
+      partModel: searchForm.partModel ? searchForm.partModel.trim() || undefined : undefined,
       startTime: searchForm.dateRange?.[0] ? `${searchForm.dateRange[0]} 00:00:00` : undefined,
       endTime: searchForm.dateRange?.[1] ? `${searchForm.dateRange[1]} 23:59:59` : undefined
     })

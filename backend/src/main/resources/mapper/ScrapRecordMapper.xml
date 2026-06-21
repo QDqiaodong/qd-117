@@ -23,7 +23,7 @@
                 AND create_time &lt;= #{endTime}
             </if>
             <if test="partModel != null and partModel != ''">
-                AND part_model LIKE CONCAT(#{partModel}, '%')
+                AND TRIM(part_model) LIKE CONCAT(TRIM(#{partModel}), '%')
             </if>
             <if test="scrapReason != null and scrapReason != ''">
                 AND scrap_reason = #{scrapReason}

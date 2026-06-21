@@ -55,11 +55,32 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
 
         List<StockInRecord> records = new ArrayList<>();
         for (StockInDTO.StockInItem item : dto.getItems()) {
+            if (item.getPartModel() != null) {
+                item.setPartModel(item.getPartModel().trim());
+            }
+            if (item.getPartName() != null) {
+                item.setPartName(item.getPartName().trim());
+            }
+            if (item.getShelfNo() != null) {
+                item.setShelfNo(item.getShelfNo().trim());
+            }
+            if (item.getUnit() != null) {
+                item.setUnit(item.getUnit().trim());
+            }
+            if (item.getRemark() != null) {
+                item.setRemark(item.getRemark().trim());
+            }
+            if (item.getSpecParams() != null) {
+                item.setSpecParams(item.getSpecParams().trim());
+            }
             SmallPart existingPart = smallPartService.getByModel(item.getPartModel());
             String oldShelfNo = existingPart != null ? existingPart.getShelfNo() : null;
+            String oldPartTypeForUpdate = existingPart != null ? existingPart.getPartType() : item.getPartType();
             boolean isNewPart = existingPart == null;
             boolean shelfChanged = existingPart != null && item.getShelfNo() != null
                     && !item.getShelfNo().isEmpty() && !item.getShelfNo().equals(existingPart.getShelfNo());
+            int oldQty = existingPart != null && existingPart.getStockQuantity() != null
+                    ? existingPart.getStockQuantity() : 0;
 
             SmallPart part;
             if (isNewPart) {
@@ -78,23 +99,43 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                 if (item.getPartName() != null && !item.getPartName().isEmpty()) {
                     part.setPartName(item.getPartName());
                 }
+                if (item.getPartType() != null && !item.getPartType().isEmpty()) {
+                    part.setPartType(item.getPartType());
+                }
                 if (item.getSpecParams() != null && !item.getSpecParams().isEmpty()) {
                     part.setSpecParams(item.getSpecParams());
                 }
                 if (item.getShelfNo() != null && !item.getShelfNo().isEmpty()) {
                     part.setShelfNo(item.getShelfNo());
                 }
+                if (item.getUnit() != null && !item.getUnit().isEmpty()) {
+                    part.setUnit(item.getUnit());
+                }
                 if (item.getRemark() != null && !item.getRemark().isEmpty()) {
                     part.setRemark(item.getRemark());
                 }
-                smallPartService.update(part);
+                boolean partTypeChangedForUpdate = !oldPartTypeForUpdate.equals(part.getPartType());
+                smallPartService.update(part, partTypeChangedForUpdate, oldPartTypeForUpdate);
                 smallPartService.increaseStock(part.getId(), item.getQuantity());
             }
 
-            if ("顶针".equals(item.getPartType())) {
+            String newPartType = item.getPartType();
+            String oldPartType = existingPart != null ? existingPart.getPartType() : newPartType;
+            boolean partTypeChanged = !oldPartType.equals(newPartType);
+
+            if (partTypeChanged && existingPart != null) {
+                if ("顶针".equals(oldPartType) && oldQty > 0) {
+                    shelfCapacityService.decreasePinBoxes(existingPart.getShelfNo(), oldQty);
+                } else if ("限位垫片".equals(oldPartType) && oldQty > 0) {
+                    shelfCapacityService.decreaseShimPacks(existingPart.getShelfNo(), oldQty);
+                }
+                if ("顶针".equals(newPartType)) {
+                    shelfCapacityService.increasePinBoxes(item.getShelfNo(), oldQty + item.getQuantity());
+                } else if ("限位垫片".equals(newPartType)) {
+                    shelfCapacityService.increaseShimPacks(item.getShelfNo(), oldQty + item.getQuantity());
+                }
+            } else if ("顶针".equals(newPartType)) {
                 if (shelfChanged && oldShelfNo != null) {
-                    int oldQty = existingPart != null && existingPart.getStockQuantity() != null
-                            ? existingPart.getStockQuantity() : 0;
                     if (oldQty > 0) {
                         shelfCapacityService.decreasePinBoxes(oldShelfNo, oldQty);
                     }
@@ -102,10 +143,8 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                 } else {
                     shelfCapacityService.increasePinBoxes(item.getShelfNo(), item.getQuantity());
                 }
-            } else if ("限位垫片".equals(item.getPartType())) {
+            } else if ("限位垫片".equals(newPartType)) {
                 if (shelfChanged && oldShelfNo != null) {
-                    int oldQty = existingPart != null && existingPart.getStockQuantity() != null
-                            ? existingPart.getStockQuantity() : 0;
                     if (oldQty > 0) {
                         shelfCapacityService.decreaseShimPacks(oldShelfNo, oldQty);
                     }
