@@ -24,7 +24,11 @@
       :row-class-name="rowClassName"
       :cell-class-name="cellClassName"
     >
-      <el-table-column label="序号" type="index" width="60" align="center" />
+      <el-table-column label="序号" width="60" align="center">
+        <template #default="{ row }">
+          {{ row._originalIndex + 1 }}
+        </template>
+      </el-table-column>
 
       <el-table-column
         v-for="col in columns"
@@ -34,7 +38,7 @@
         :min-width="col.minWidth"
         align="center"
       >
-        <template #default="{ row, $index }">
+        <template #default="{ row }">
           <template v-if="col.type === 'readonly'">
             <span class="readonly-cell">{{ row[col.prop] !== undefined && row[col.prop] !== null ? row[col.prop] : '-' }}</span>
           </template>
@@ -44,11 +48,11 @@
               placeholder="请选择"
               size="small"
               style="width: 100%;"
-              :class="{ 'cell-error': hasError($index, col.prop) }"
-              @change="handleCellChange($index, col.prop)"
+              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+              @change="handleCellChange(row._originalIndex, col.prop)"
             >
               <el-option
-                v-for="opt in (col.optionsFn ? col.optionsFn(row, $index) : col.options)"
+                v-for="opt in (col.optionsFn ? col.optionsFn(row, row._originalIndex) : col.options)"
                 :key="opt.value"
                 :label="opt.label"
                 :value="opt.value"
@@ -61,8 +65,8 @@
               :min="col.min !== undefined ? col.min : 0"
               size="small"
               style="width: 100%;"
-              :class="{ 'cell-error': hasError($index, col.prop) }"
-              @change="handleInputNumberChange($index, col.prop)"
+              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+              @change="handleInputNumberChange(row._originalIndex, col.prop)"
               controls-position="right"
             />
           </template>
@@ -71,20 +75,20 @@
               v-model="row[col.prop]"
               :placeholder="col.placeholder || '请输入'"
               size="small"
-              :class="{ 'cell-error': hasError($index, col.prop) }"
-              @change="handleCellChange($index, col.prop)"
+              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+              @change="handleCellChange(row._originalIndex, col.prop)"
             />
           </template>
         </template>
       </el-table-column>
 
       <el-table-column label="操作" width="80" align="center" fixed="right">
-        <template #default="{ $index }">
+        <template #default="{ row }">
           <el-button
             type="danger"
             link
             size="small"
-            @click="removeRow($index)"
+            @click="removeRow(row._originalIndex)"
           >
             删除
           </el-button>
@@ -192,11 +196,12 @@ const removeRow = (index) => {
 const scrollToRow = async (rowIndex) => {
   if (rowIndex < 0 || rowIndex >= tableData.value.length) return
   await nextTick()
+  const displayIdx = displayData.value.findIndex(r => r._originalIndex === rowIndex)
   const table = tableRef.value
-  if (table) {
+  if (table && displayIdx >= 0) {
     const rows = table.$el.querySelectorAll('.el-table__body-wrapper tbody tr')
-    if (rows[rowIndex]) {
-      rows[rowIndex].scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (rows[displayIdx]) {
+      rows[displayIdx].scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }
   triggerRowHighlight(rowIndex)
@@ -297,10 +302,14 @@ const errorRows = computed(() => {
 })
 
 const displayData = computed(() => {
+  const rows = tableData.value.map((row, index) => ({
+    ...row,
+    _originalIndex: index
+  }))
   if (!props.rowFilterFn) {
-    return tableData.value
+    return rows
   }
-  return tableData.value.filter((row, index) => props.rowFilterFn(row, index))
+  return rows.filter((row) => props.rowFilterFn(row, row._originalIndex))
 })
 
 const unfilledCount = computed(() => {
@@ -330,28 +339,30 @@ const clearRowErrors = (rowIndex) => {
   delete rowErrors[rowIndex]
 }
 
-const cellClassName = ({ rowIndex, column }) => {
+const cellClassName = ({ row, column }) => {
   const prop = column.property
-  if (hasError(rowIndex, prop)) {
+  const originalIndex = row._originalIndex
+  if (hasError(originalIndex, prop)) {
     return 'cell-error-cell'
   }
   return ''
 }
 
-const rowClassName = ({ row, rowIndex }) => {
-  const base = rowIndex % 2 === 0 ? '' : 'row-alt'
+const rowClassName = ({ row }) => {
+  const originalIndex = row._originalIndex
+  const base = originalIndex % 2 === 0 ? '' : 'row-alt'
   const classes = [base]
-  if (rowErrors[rowIndex]) {
+  if (rowErrors[originalIndex]) {
     classes.push('row-error')
   }
-  if (highlightRowIndex.value === rowIndex) {
+  if (highlightRowIndex.value === originalIndex) {
     classes.push('row-highlight')
   }
-  if (props.rowUnfilledFn && props.rowUnfilledFn(row, rowIndex)) {
+  if (props.rowUnfilledFn && props.rowUnfilledFn(row, originalIndex)) {
     classes.push('row-unfilled')
   }
   if (props.rowExtraClassFn) {
-    const extra = props.rowExtraClassFn(row, rowIndex)
+    const extra = props.rowExtraClassFn(row, originalIndex)
     if (extra) {
       classes.push(extra)
     }

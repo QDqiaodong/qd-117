@@ -533,16 +533,19 @@ const submit = async () => {
   }
 
   const unfilledItems = rowsWithPart.filter(i => isRowUnfilled(i))
-  const validItems = rowsWithPart.map(i => ({
+  const filledItems = rowsWithPart.filter(i => !isRowUnfilled(i))
+  const buildPayload = (list) => list.map(i => ({
     partId: i.partId,
     actualQuantity: i.actualQuantity,
     remark: i.remark || ''
   }))
+  let validItems = buildPayload(filledItems)
+
   if (unfilledItems.length > 0) {
     showOnlyUnfilled.value = true
     try {
       await ElMessageBox.confirm(
-        `检测到有 ${unfilledItems.length} 项顶针/垫片尚未录入实物数量，已为您过滤显示。\n是否忽略这些未录入项，直接提交已录入的 ${validItems.length - unfilledItems.length} 条？\n\n建议：先完成全部实物盘点，再行提交。`,
+        `检测到有 ${unfilledItems.length} 项顶针/垫片尚未录入实物数量，已为您过滤显示。\n是否忽略这些未录入项，直接提交已录入的 ${filledItems.length} 条？\n\n建议：先完成全部实物盘点，再行提交。`,
         '存在未录入实物数量的行',
         {
           confirmButtonText: '忽略未录入，提交已录入的',
@@ -557,6 +560,11 @@ const submit = async () => {
         return
       }
     }
+  }
+
+  if (validItems.length === 0) {
+    ElMessage.warning('没有已录入的盘点项可提交，请先完成实物数量录入')
+    return
   }
 
   try {
