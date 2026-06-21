@@ -41,5 +41,9 @@ public class StockInDTO {
         private String unit;
 
         private String remark;
+
+        private String boxNoStart;
+
+        private String boxNoEnd;
     }
 }

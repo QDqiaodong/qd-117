@@ -62,6 +62,12 @@ const routes = [
     meta: { title: '破损原因字典' }
   },
   {
+    path: '/pin-box',
+    name: 'PinBox',
+    component: () => import('@/views/PinBox.vue'),
+    meta: { title: '顶针盒号管理' }
+  },
+  {
     path: '/records',
     name: 'Records',
     component: () => import('@/views/Records.vue'),

@@ -34,5 +34,7 @@ public class StockInRecord implements Serializable {
 
     private String remark;
 
+    private String boxNos;
+
     private LocalDateTime createTime;
 }

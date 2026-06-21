@@ -28,6 +28,7 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
     private final SmallPartService smallPartService;
     private final ShelfCapacityService shelfCapacityService;
     private final LineQuotaService lineQuotaService;
+    private final PinBoxService pinBoxService;
 
     public IPage<StockOutRecord> getPageList(Integer pageNum, Integer pageSize, String partModel,
                                               String productionLine, String startTime, String endTime) {
@@ -104,6 +105,17 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
             record.setCreateTime(LocalDateTime.now());
             save(record);
             records.add(record);
+
+            if ("顶针".equals(part.getPartType()) && item.getBoxNos() != null && !item.getBoxNos().isEmpty()) {
+                List<com.inventory.entity.PinBox> consumedBoxes = pinBoxService.consumeBoxes(
+                        item.getBoxNos(), part.getId(), record.getId(),
+                        dto.getProductionLine(), dto.getRemark()
+                );
+                String boxNosStr = consumedBoxes.stream().map(com.inventory.entity.PinBox::getBoxNo)
+                        .collect(java.util.stream.Collectors.joining(","));
+                record.setBoxNos(boxNosStr);
+                updateById(record);
+            }
 
             log.info("出库登记: 型号={}, 数量={}, 产线={}, 货架={}, 操作人={}",
                     part.getPartModel(), item.getQuantity(), dto.getProductionLine(),

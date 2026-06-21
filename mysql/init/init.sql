@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS stock_in_record (
     shelf_no VARCHAR(50) NOT NULL COMMENT '存放货架编号',
     operator VARCHAR(50) NOT NULL COMMENT '操作人',
     remark VARCHAR(500) COMMENT '备注',
+    box_nos VARCHAR(2000) COMMENT '盒号列表（逗号分隔）',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
     INDEX idx_create_time (create_time),
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS stock_out_record (
     operator VARCHAR(50) NOT NULL COMMENT '操作人',
     receiver VARCHAR(50) COMMENT '领用人',
     remark VARCHAR(500) COMMENT '备注',
+    box_nos VARCHAR(2000) COMMENT '盒号列表（逗号分隔）',
     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_part_id (part_id),
     INDEX idx_create_time (create_time),
@@ -150,3 +152,25 @@ INSERT INTO scrap_reason (reason_code, reason_name, part_type, sort, status) VAL
 ('SHIM_WEAR', '垫片磨损', '限位垫片', 7, 1),
 ('SHIM_OTHER', '垫片其他', '限位垫片', 8, 1),
 ('COMMON_OTHER', '其他', '全部', 99, 1);
+
+CREATE TABLE IF NOT EXISTS pin_box (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    box_no VARCHAR(100) NOT NULL COMMENT '盒号',
+    part_id BIGINT NOT NULL COMMENT '零件ID',
+    part_model VARCHAR(100) NOT NULL COMMENT '零件型号',
+    status VARCHAR(30) NOT NULL COMMENT '状态：IN_STOCK-在库，OUT_OF_STOCK-已出库，SCRAPPED-已报废',
+    stock_in_record_id BIGINT COMMENT '入库记录ID',
+    stock_out_record_id BIGINT COMMENT '出库记录ID',
+    production_line VARCHAR(100) COMMENT '领用产线',
+    shelf_no VARCHAR(50) NOT NULL COMMENT '货架编号',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_box_no (box_no),
+    INDEX idx_part_id (part_id),
+    INDEX idx_status (status),
+    INDEX idx_part_model (part_model),
+    INDEX idx_stock_in_record_id (stock_in_record_id),
+    INDEX idx_stock_out_record_id (stock_out_record_id),
+    INDEX idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顶针盒号表';

@@ -61,6 +61,11 @@
       <el-table-column prop="partModel" label="零件型号" min-width="140" />
       <el-table-column prop="quantity" label="入库数量" width="100" align="center" />
       <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
+      <el-table-column label="盒号" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.boxNos || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="operator" label="操作人" width="100" align="center" />
       <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
       <el-table-column prop="createTime" label="入库时间" width="170" align="center" />
@@ -145,7 +150,9 @@ const fieldLabelMap = {
   shelfNo: '货架编号',
   quantity: '入库数量',
   unit: '单位',
-  remark: '备注'
+  remark: '备注',
+  boxNoStart: '盒号起始',
+  boxNoEnd: '盒号结束'
 }
 
 const form = reactive({
@@ -202,6 +209,20 @@ const columns = [
   { prop: 'shelfNo', label: '货架编号', placeholder: '如:A-01-03', minWidth: 120 },
   { prop: 'quantity', label: '入库数量', type: 'number', min: 0, width: 120 },
   { prop: 'unit', label: '单位', placeholder: '默认:件', width: 100, defaultValue: '件' },
+  {
+    prop: 'boxNoStart',
+    label: '盒号起始',
+    placeholder: '顶针必填，如: A001',
+    minWidth: 140,
+    showFn: (row) => !row || row.partType === '顶针'
+  },
+  {
+    prop: 'boxNoEnd',
+    label: '盒号结束',
+    placeholder: '可选，与起始相同可留空',
+    minWidth: 140,
+    showFn: (row) => !row || row.partType === '顶针'
+  },
   { prop: 'remark', label: '备注', placeholder: '可选', minWidth: 150 }
 ]
 
@@ -237,6 +258,16 @@ const validators = {
       return { valid: false, message: '数量必须大于0' }
     }
     return { valid: true }
+  },
+  boxNoStart: (value, row) => {
+    if (row && row.partType !== '顶针') {
+      return { valid: true }
+    }
+    const trimmed = value ? value.trim() : ''
+    if (!trimmed) {
+      return { valid: false, message: '顶针类型请填写盒号起始' }
+    }
+    return { valid: true }
   }
 }
 
@@ -265,7 +296,9 @@ const submit = async () => {
       specParams: i.specParams ? i.specParams.trim() : i.specParams,
       shelfNo: i.shelfNo ? i.shelfNo.trim() : i.shelfNo,
       unit: i.unit ? i.unit.trim() : i.unit,
-      remark: i.remark ? i.remark.trim() : i.remark
+      remark: i.remark ? i.remark.trim() : i.remark,
+      boxNoStart: i.boxNoStart ? i.boxNoStart.trim() : i.boxNoStart,
+      boxNoEnd: i.boxNoEnd ? i.boxNoEnd.trim() : i.boxNoEnd
     }))
   if (validItems.length === 0) {
     ElMessage.warning('请至少填写一行有效的入库数据')

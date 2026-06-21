@@ -297,3 +297,32 @@ export const toggleScrapReasonStatus = (id) => {
     method: 'post'
   })
 }
+
+export const getPinBoxPage = (params) => {
+  return request({
+    url: '/pin-box/page',
+    method: 'get',
+    params
+  })
+}
+
+export const getAvailablePinBoxes = (partId) => {
+  return request({
+    url: `/pin-box/available/${partId}`,
+    method: 'get'
+  })
+}
+
+export const getPinBoxesByStockIn = (recordId) => {
+  return request({
+    url: `/pin-box/by-stock-in/${recordId}`,
+    method: 'get'
+  })
+}
+
+export const getPinBoxesByStockOut = (recordId) => {
+  return request({
+    url: `/pin-box/by-stock-out/${recordId}`,
+    method: 'get'
+  })
+}

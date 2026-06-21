@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.inventory.mapper.PinBoxMapper">
+
+    <resultMap id="BaseResultMap" type="com.inventory.entity.PinBox">
+        <id column="id" property="id"/>
+        <result column="box_no" property="boxNo"/>
+        <result column="part_id" property="partId"/>
+        <result column="part_model" property="partModel"/>
+        <result column="status" property="status"/>
+        <result column="stock_in_record_id" property="stockInRecordId"/>
+        <result column="stock_out_record_id" property="stockOutRecordId"/>
+        <result column="production_line" property="productionLine"/>
+        <result column="shelf_no" property="shelfNo"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        SELECT * FROM pin_box
+        <where>
+            <if test="startTime != null and startTime != ''">
+                AND create_time >= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND create_time &lt;= #{endTime}
+            </if>
+            <if test="partModel != null and partModel != ''">
+                AND TRIM(part_model) LIKE CONCAT(TRIM(#{partModel}), '%')
+            </if>
+            <if test="boxNo != null and boxNo != ''">
+                AND TRIM(box_no) LIKE CONCAT(TRIM(#{boxNo}), '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="productionLine != null and productionLine != ''">
+                AND production_line = #{productionLine}
+            </if>
+        </where>
+        ORDER BY create_time DESC, id DESC
+    </select>
+
+    <select id="selectAvailableByPartId" resultMap="BaseResultMap">
+        SELECT * FROM pin_box
+        WHERE part_id = #{partId} AND status = 'IN_STOCK'
+        ORDER BY box_no ASC
+    </select>
+
+    <select id="selectByBoxNos" resultMap="BaseResultMap">
+        SELECT * FROM pin_box
+        WHERE box_no IN
+        <foreach collection="boxNos" item="boxNo" open="(" separator="," close=")">
+            #{boxNo}
+        </foreach>
+        ORDER BY box_no ASC
+    </select>
+
+    <select id="selectByStockInRecordId" resultMap="BaseResultMap">
+        SELECT * FROM pin_box
+        WHERE stock_in_record_id = #{stockInRecordId}
+        ORDER BY box_no ASC
+    </select>
+
+    <select id="selectByStockOutRecordId" resultMap="BaseResultMap">
+        SELECT * FROM pin_box
+        WHERE stock_out_record_id = #{stockOutRecordId}
+        ORDER BY box_no ASC
+    </select>
+
+</mapper>

@@ -32,6 +32,7 @@
 
       <el-table-column
         v-for="col in columns"
+        v-show="!col.showFn || col.showFn(null, -1)"
         :key="col.prop"
         :label="col.label"
         :width="col.width"
@@ -39,45 +40,52 @@
         align="center"
       >
         <template #default="{ row }">
-          <template v-if="col.type === 'readonly'">
-            <span class="readonly-cell">{{ row[col.prop] !== undefined && row[col.prop] !== null ? row[col.prop] : '-' }}</span>
-          </template>
-          <template v-else-if="col.type === 'select'">
-            <el-select
-              v-model="row[col.prop]"
-              placeholder="请选择"
-              size="small"
-              style="width: 100%;"
-              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
-              @change="handleCellChange(row._originalIndex, col.prop)"
-            >
-              <el-option
-                v-for="opt in (col.optionsFn ? col.optionsFn(row, row._originalIndex) : col.options)"
-                :key="opt.value"
-                :label="opt.label"
-                :value="opt.value"
+          <template v-if="!col.showFn || col.showFn(row, row._originalIndex)">
+            <template v-if="col.type === 'readonly'">
+              <span class="readonly-cell">{{ row[col.prop] !== undefined && row[col.prop] !== null ? row[col.prop] : '-' }}</span>
+            </template>
+            <template v-else-if="col.type === 'select'">
+              <el-select
+                v-model="row[col.prop]"
+                :multiple="col.multiple || false"
+                :collapse-tags="col.multiple || false"
+                placeholder="请选择"
+                size="small"
+                style="width: 100%;"
+                :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+                @change="handleCellChange(row._originalIndex, col.prop)"
+              >
+                <el-option
+                  v-for="opt in (col.optionsFn ? col.optionsFn(row, row._originalIndex) : col.options)"
+                  :key="opt.value"
+                  :label="opt.label"
+                  :value="opt.value"
+                />
+              </el-select>
+            </template>
+            <template v-else-if="col.type === 'number'">
+              <el-input-number
+                v-model="row[col.prop]"
+                :min="col.min !== undefined ? col.min : 0"
+                size="small"
+                style="width: 100%;"
+                :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+                @change="handleInputNumberChange(row._originalIndex, col.prop)"
+                controls-position="right"
               />
-            </el-select>
-          </template>
-          <template v-else-if="col.type === 'number'">
-            <el-input-number
-              v-model="row[col.prop]"
-              :min="col.min !== undefined ? col.min : 0"
-              size="small"
-              style="width: 100%;"
-              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
-              @change="handleInputNumberChange(row._originalIndex, col.prop)"
-              controls-position="right"
-            />
+            </template>
+            <template v-else>
+              <el-input
+                v-model="row[col.prop]"
+                :placeholder="col.placeholder || '请输入'"
+                size="small"
+                :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
+                @change="handleCellChange(row._originalIndex, col.prop)"
+              />
+            </template>
           </template>
           <template v-else>
-            <el-input
-              v-model="row[col.prop]"
-              :placeholder="col.placeholder || '请输入'"
-              size="small"
-              :class="{ 'cell-error': hasError(row._originalIndex, col.prop) }"
-              @change="handleCellChange(row._originalIndex, col.prop)"
-            />
+            <span class="disabled-cell">—</span>
           </template>
         </template>
       </el-table-column>
@@ -147,7 +155,11 @@ const createEmptyRow = () => {
   const row = { _touched: false }
   props.columns.forEach(col => {
     if (col.type === 'readonly') return
-    row[col.prop] = col.defaultValue !== undefined ? col.defaultValue : ''
+    if (col.type === 'select' && col.multiple) {
+      row[col.prop] = col.defaultValue !== undefined ? col.defaultValue : []
+    } else {
+      row[col.prop] = col.defaultValue !== undefined ? col.defaultValue : ''
+    }
   })
   return row
 }
@@ -235,6 +247,9 @@ const markRowTouched = (index) => {
 const handleCellChange = (index, prop) => {
   markRowTouched(index)
   validateCell(index, prop)
+  if (prop === 'partType' || prop === 'partId') {
+    validateRow(index)
+  }
   emitChange()
 }
 
@@ -258,10 +273,20 @@ const emitValidationChange = () => {
 }
 
 const validateCell = (rowIndex, prop) => {
+  const col = props.columns.find(c => c.prop === prop)
+  const row = tableData.value[rowIndex]
+  if (col && col.showFn && !col.showFn(row, rowIndex)) {
+    if (rowErrors[rowIndex]) {
+      delete rowErrors[rowIndex][prop]
+      if (Object.keys(rowErrors[rowIndex]).length === 0) {
+        delete rowErrors[rowIndex]
+      }
+    }
+    return
+  }
   const validator = props.validators[prop]
   if (validator) {
     const value = tableData.value[rowIndex][prop]
-    const row = tableData.value[rowIndex]
     const result = validator(value, row, rowIndex, tableData.value)
     if (result && !result.valid) {
       if (!rowErrors[rowIndex]) rowErrors[rowIndex] = {}
@@ -475,6 +500,11 @@ defineExpose({
   border-radius: 4px;
   display: inline-block;
   min-width: 50px;
+}
+
+:deep(.disabled-cell) {
+  color: #c0c4cc;
+  font-style: italic;
 }
 
 :deep(.cell-error) {

@@ -34,5 +34,7 @@ public class StockOutDTO {
         @NotNull(message = "领用数量不能为空")
         @Min(value = 1, message = "领用数量必须大于0")
         private Integer quantity;
+
+        private List<String> boxNos;
     }
 }

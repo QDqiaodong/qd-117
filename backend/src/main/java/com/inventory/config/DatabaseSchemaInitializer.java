@@ -27,6 +27,7 @@ public class DatabaseSchemaInitializer {
         ensureShelfCapacityTable();
         ensureLineQuotaTable();
         ensureScrapReasonTable();
+        ensurePinBoxTable();
     }
 
     private void ensureSmallPartTable() {
@@ -59,6 +60,7 @@ public class DatabaseSchemaInitializer {
                     shelf_no VARCHAR(50) NOT NULL COMMENT '存放货架编号',
                     operator VARCHAR(50) NOT NULL COMMENT '操作人',
                     remark VARCHAR(500) COMMENT '备注',
+                    box_nos VARCHAR(2000) COMMENT '盒号列表（逗号分隔）',
                     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_part_id (part_id),
                     INDEX idx_create_time (create_time),
@@ -66,6 +68,7 @@ public class DatabaseSchemaInitializer {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='入库记录表'
                 """;
         executeDdl("stock_in_record", ddl);
+        ensureColumnExists("stock_in_record", "box_nos", "VARCHAR(2000) COMMENT '盒号列表（逗号分隔）'");
     }
 
     private void ensureStockOutRecordTable() {
@@ -79,6 +82,7 @@ public class DatabaseSchemaInitializer {
                     operator VARCHAR(50) NOT NULL COMMENT '操作人',
                     receiver VARCHAR(50) COMMENT '领用人',
                     remark VARCHAR(500) COMMENT '备注',
+                    box_nos VARCHAR(2000) COMMENT '盒号列表（逗号分隔）',
                     create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_part_id (part_id),
                     INDEX idx_create_time (create_time),
@@ -86,6 +90,7 @@ public class DatabaseSchemaInitializer {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='出库领用记录表'
                 """;
         executeDdl("stock_out_record", ddl);
+        ensureColumnExists("stock_out_record", "box_nos", "VARCHAR(2000) COMMENT '盒号列表（逗号分隔）'");
     }
 
     private void ensureStockCheckSnapshotTable() {
@@ -254,6 +259,48 @@ public class DatabaseSchemaInitializer {
             log.info("初始化破损原因字典默认数据完成");
         } catch (Exception e) {
             log.warn("初始化破损原因默认数据失败", e);
+        }
+    }
+
+    private void ensurePinBoxTable() {
+        String ddl = """
+                CREATE TABLE IF NOT EXISTS pin_box (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    box_no VARCHAR(100) NOT NULL COMMENT '盒号',
+                    part_id BIGINT NOT NULL COMMENT '零件ID',
+                    part_model VARCHAR(100) NOT NULL COMMENT '零件型号',
+                    status VARCHAR(30) NOT NULL COMMENT '状态：IN_STOCK-在库，OUT_OF_STOCK-已出库，SCRAPPED-已报废',
+                    stock_in_record_id BIGINT COMMENT '入库记录ID',
+                    stock_out_record_id BIGINT COMMENT '出库记录ID',
+                    production_line VARCHAR(100) COMMENT '领用产线',
+                    shelf_no VARCHAR(50) NOT NULL COMMENT '货架编号',
+                    remark VARCHAR(500) COMMENT '备注',
+                    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_box_no (box_no),
+                    INDEX idx_part_id (part_id),
+                    INDEX idx_status (status),
+                    INDEX idx_part_model (part_model),
+                    INDEX idx_stock_in_record_id (stock_in_record_id),
+                    INDEX idx_stock_out_record_id (stock_out_record_id),
+                    INDEX idx_create_time (create_time)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顶针盒号表'
+                """;
+        executeDdl("pin_box", ddl);
+    }
+
+    private void ensureColumnExists(String tableName, String columnName, String columnDef) {
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             var rs = connection.getMetaData().getColumns(null, null, tableName, columnName)) {
+            if (rs.next()) {
+                return;
+            }
+            String alterSql = String.format("ALTER TABLE %s ADD COLUMN %s %s", tableName, columnName, columnDef);
+            statement.execute(alterSql);
+            log.info("表 {} 已添加列 {}", tableName, columnName);
+        } catch (Exception e) {
+            log.warn("检查表 {} 列 {} 失败或添加失败", tableName, columnName, e);
         }
     }
 

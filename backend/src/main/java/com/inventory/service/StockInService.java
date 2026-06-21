@@ -28,6 +28,7 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
     private final StockInRecordMapper stockInRecordMapper;
     private final SmallPartService smallPartService;
     private final ShelfCapacityService shelfCapacityService;
+    private final PinBoxService pinBoxService;
 
     public IPage<StockInRecord> getPageList(Integer pageNum, Integer pageSize, String partModel, String startTime, String endTime) {
         Page<StockInRecord> page = new Page<>(pageNum, pageSize);
@@ -155,6 +156,19 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             save(record);
             records.add(record);
 
+            if ("顶针".equals(item.getPartType()) && item.getBoxNoStart() != null && !item.getBoxNoStart().trim().isEmpty()) {
+                String boxNoStart = item.getBoxNoStart().trim();
+                String boxNoEnd = (item.getBoxNoEnd() != null && !item.getBoxNoEnd().trim().isEmpty()) ? item.getBoxNoEnd().trim() : boxNoStart;
+                List<com.inventory.entity.PinBox> boxes = pinBoxService.createBoxesFromRange(
+                        part.getId(), part.getPartModel(), item.getShelfNo(),
+                        boxNoStart, boxNoEnd, record.getId(), item.getRemark()
+                );
+                String boxNosStr = boxes.stream().map(com.inventory.entity.PinBox::getBoxNo)
+                        .collect(java.util.stream.Collectors.joining(","));
+                record.setBoxNos(boxNosStr);
+                updateById(record);
+            }
+
             log.info("入库登记: 型号={}, 数量={}, 货架={}, 操作人={}",
                     part.getPartModel(), item.getQuantity(), item.getShelfNo(), dto.getOperator());
         }
@@ -182,6 +196,12 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
         }
         if (item.getSpecParams() != null) {
             item.setSpecParams(item.getSpecParams().trim());
+        }
+        if (item.getBoxNoStart() != null) {
+            item.setBoxNoStart(item.getBoxNoStart().trim());
+        }
+        if (item.getBoxNoEnd() != null) {
+            item.setBoxNoEnd(item.getBoxNoEnd().trim());
         }
     }
 

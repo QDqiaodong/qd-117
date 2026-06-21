@@ -83,6 +83,11 @@
     <el-table :data="recordData" stripe border v-loading="loading" style="width: 100%;">
       <el-table-column prop="partModel" label="零件型号" min-width="140" />
       <el-table-column prop="quantity" label="领用数量" width="100" align="center" />
+      <el-table-column label="盒号去向" min-width="200" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ row.boxNos || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="productionLine" label="领用产线" width="120" align="center" />
       <el-table-column prop="operator" label="操作人" width="100" align="center" />
       <el-table-column prop="receiver" label="领用人" width="100" align="center" />
@@ -163,7 +168,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
-import { stockOut, getStockOutPage, getPartList, checkLineQuota } from '@/api'
+import { stockOut, getStockOutPage, getPartList, checkLineQuota, getAvailablePinBoxes } from '@/api'
 
 const submitting = ref(false)
 const loading = ref(false)
@@ -175,9 +180,11 @@ const quotaDialogVisible = ref(false)
 const quotaCheckResult = ref({ details: [] })
 const fieldLabelMap = {
   partId: '选择零件',
-  quantity: '领用数量'
+  quantity: '领用数量',
+  boxNos: '选择盒号'
 }
 const partList = ref([])
+const availableBoxesMap = reactive({})
 
 const form = reactive({
   productionLine: '',
@@ -220,6 +227,27 @@ const groupedValidationErrors = computed(() => {
   return Array.from(map.values()).sort((a, b) => a.rowIndex - b.rowIndex)
 })
 
+const isPinPart = (partId) => {
+  const part = partList.value.find(p => p.id === partId)
+  return part && part.partType === '顶针'
+}
+
+const loadAvailableBoxes = async (partId) => {
+  if (!partId) return
+  if (availableBoxesMap[partId]) return
+  if (!isPinPart(partId)) {
+    availableBoxesMap[partId] = []
+    return
+  }
+  try {
+    const res = await getAvailablePinBoxes(partId)
+    availableBoxesMap[partId] = res.data || []
+  } catch (e) {
+    console.error(e)
+    availableBoxesMap[partId] = []
+  }
+}
+
 const columns = reactive([
   {
     prop: 'partId',
@@ -228,7 +256,20 @@ const columns = reactive([
     minWidth: 200,
     options: []
   },
-  { prop: 'quantity', label: '领用数量', type: 'number', min: 0, width: 120 }
+  { prop: 'quantity', label: '领用数量', type: 'number', min: 0, width: 120 },
+  {
+    prop: 'boxNos',
+    label: '选择盒号',
+    type: 'select',
+    multiple: true,
+    minWidth: 260,
+    optionsFn: (row) => {
+      if (!row || !row.partId) return []
+      const boxes = availableBoxesMap[row.partId] || []
+      return boxes.map(b => ({ label: b.boxNo, value: b.boxNo }))
+    },
+    showFn: (row) => !row || isPinPart(row.partId)
+  }
 ])
 
 const validators = {
@@ -236,6 +277,7 @@ const validators = {
     if (!value) {
       return { valid: false, message: '请选择零件' }
     }
+    loadAvailableBoxes(value)
     return { valid: true }
   },
   quantity: (value, row, rowIndex, allRows) => {
@@ -258,6 +300,21 @@ const validators = {
       }
     }
     return { valid: true }
+  },
+  boxNos: (value, row) => {
+    if (!row || !row.partId) {
+      return { valid: true }
+    }
+    if (!isPinPart(row.partId)) {
+      return { valid: true }
+    }
+    if (!value || !Array.isArray(value) || value.length === 0) {
+      return { valid: false, message: '顶针请选择盒号' }
+    }
+    if (value.length !== row.quantity) {
+      return { valid: false, message: `盒号数量(${value.length})需等于领用数量(${row.quantity})` }
+    }
+    return { valid: true }
   }
 }
 
@@ -265,6 +322,7 @@ const loadPartList = async () => {
   try {
     const res = await getPartList()
     partList.value = res.data
+    Object.keys(availableBoxesMap).forEach(k => delete availableBoxesMap[k])
     columns[0].options = res.data.map(p => ({
       label: `${p.partModel} - ${p.partName} (库存:${p.stockQuantity})`,
       value: p.id
@@ -296,6 +354,16 @@ const submit = async () => {
   }
 
   const validItems = form.items.filter(i => i.partId && i.quantity > 0)
+    .map(i => {
+      const item = {
+        partId: i.partId,
+        quantity: i.quantity
+      }
+      if (i.boxNos && Array.isArray(i.boxNos) && i.boxNos.length > 0) {
+        item.boxNos = i.boxNos
+      }
+      return item
+    })
   if (validItems.length === 0) {
     ElMessage.warning('请至少选择一个零件并填写领用数量')
     return
@@ -347,6 +415,7 @@ const resetForm = () => {
   form.receiver = ''
   form.remark = ''
   form.items = []
+  Object.keys(availableBoxesMap).forEach(k => delete availableBoxesMap[k])
 }
 
 const loadRecords = async () => {

@@ -11,32 +11,36 @@ import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("stock_out_record")
-public class StockOutRecord implements Serializable {
+@TableName("pin_box")
+public class PinBox implements Serializable {
 
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    @NotNull(message = "小件ID不能为空")
+    @NotBlank(message = "盒号不能为空")
+    private String boxNo;
+
+    @NotNull(message = "零件ID不能为空")
     private Long partId;
 
     @NotBlank(message = "零件型号不能为空")
     private String partModel;
 
-    @NotNull(message = "领用数量不能为空")
-    private Integer quantity;
+    @NotBlank(message = "盒号状态不能为空")
+    private String status;
 
-    @NotBlank(message = "领用产线不能为空")
+    private Long stockInRecordId;
+
+    private Long stockOutRecordId;
+
     private String productionLine;
 
-    @NotBlank(message = "操作人不能为空")
-    private String operator;
-
-    private String receiver;
+    @NotBlank(message = "货架编号不能为空")
+    private String shelfNo;
 
     private String remark;
 
-    private String boxNos;
-
     private LocalDateTime createTime;
+
+    private LocalDateTime updateTime;
 }

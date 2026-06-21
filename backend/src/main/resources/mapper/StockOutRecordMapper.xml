@@ -11,6 +11,7 @@
         <result column="operator" property="operator"/>
         <result column="receiver" property="receiver"/>
         <result column="remark" property="remark"/>
+        <result column="box_nos" property="boxNos"/>
         <result column="create_time" property="createTime"/>
     </resultMap>
 

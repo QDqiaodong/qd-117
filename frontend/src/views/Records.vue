@@ -117,6 +117,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
+        <el-table-column label="盒号" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.boxNos || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="operator" label="操作人" width="100" align="center" />
         <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
         <el-table-column prop="createTime" label="入库时间" width="170" align="center" />
@@ -129,6 +134,11 @@
         <el-table-column prop="quantity" label="领用数量" width="120" align="center">
           <template #default="{ row }">
             <span class="qty-decrease">−{{ row.quantity }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="盒号去向" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ row.boxNos || '-' }}
           </template>
         </el-table-column>
         <el-table-column prop="productionLine" label="领用产线" width="120" align="center" />
