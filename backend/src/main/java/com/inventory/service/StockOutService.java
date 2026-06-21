@@ -27,6 +27,7 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
     private final StockOutRecordMapper stockOutRecordMapper;
     private final SmallPartService smallPartService;
     private final ShelfCapacityService shelfCapacityService;
+    private final LineQuotaService lineQuotaService;
 
     public IPage<StockOutRecord> getPageList(Integer pageNum, Integer pageSize, String partModel,
                                               String productionLine, String startTime, String endTime) {
@@ -53,8 +54,18 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
         }
 
         Map<Long, SmallPart> partCache = new HashMap<>();
+        Map<String, Integer> partTypeQtyMap = new HashMap<>();
         for (StockOutDTO.StockOutItem item : dto.getItems()) {
             SmallPart part = partCache.computeIfAbsent(item.getPartId(), smallPartService::getById);
+            partTypeQtyMap.merge(part.getPartType(), item.getQuantity(), Integer::sum);
+        }
+
+        for (Map.Entry<String, Integer> entry : partTypeQtyMap.entrySet()) {
+            lineQuotaService.consumeQuota(dto.getProductionLine(), entry.getKey(), entry.getValue());
+        }
+
+        for (StockOutDTO.StockOutItem item : dto.getItems()) {
+            SmallPart part = partCache.get(item.getPartId());
 
             smallPartService.decreaseStock(part.getId(), item.getQuantity());
 

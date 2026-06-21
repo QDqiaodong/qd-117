@@ -108,3 +108,18 @@ CREATE TABLE IF NOT EXISTS shelf_capacity (
     UNIQUE KEY uk_shelf_no (shelf_no),
     INDEX idx_shelf_no (shelf_no)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='货架容量表';
+
+CREATE TABLE IF NOT EXISTS line_quota (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    quarter VARCHAR(20) NOT NULL COMMENT '季度：2026-Q2',
+    production_line VARCHAR(100) NOT NULL COMMENT '领用产线：一号装配线',
+    part_type VARCHAR(50) NOT NULL COMMENT '小件类型：顶针/限位垫片',
+    max_quantity INT NOT NULL DEFAULT 0 COMMENT '季度配额上限',
+    used_quantity INT NOT NULL DEFAULT 0 COMMENT '当前已领用数量',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_quarter_line_type (quarter, production_line, part_type),
+    INDEX idx_quarter (quarter),
+    INDEX idx_production_line (production_line)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产线领用配额表';

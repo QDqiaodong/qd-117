@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.inventory.mapper.LineQuotaMapper">
+
+    <resultMap id="BaseResultMap" type="com.inventory.entity.LineQuota">
+        <id column="id" property="id"/>
+        <result column="quarter" property="quarter"/>
+        <result column="production_line" property="productionLine"/>
+        <result column="part_type" property="partType"/>
+        <result column="max_quantity" property="maxQuantity"/>
+        <result column="used_quantity" property="usedQuantity"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectPageList" resultMap="BaseResultMap">
+        SELECT * FROM line_quota
+        <where>
+            <if test="quarter != null and quarter != ''">
+                AND quarter = #{quarter}
+            </if>
+            <if test="productionLine != null and productionLine != ''">
+                AND production_line = #{productionLine}
+            </if>
+            <if test="partType != null and partType != ''">
+                AND part_type = #{partType}
+            </if>
+        </where>
+        ORDER BY quarter DESC, production_line ASC, part_type ASC
+    </select>
+
+    <update id="consumeQuotaAtomic">
+        UPDATE line_quota
+        SET used_quantity = used_quantity + #{quantity},
+            update_time = NOW()
+        WHERE id = #{id}
+          AND max_quantity &gt;= used_quantity + #{quantity}
+    </update>
+
+    <update id="rollbackQuotaAtomic">
+        UPDATE line_quota
+        SET used_quantity = GREATEST(0, used_quantity - #{quantity}),
+            update_time = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <select id="sumUsedFromRecords" resultType="int">
+        SELECT COALESCE(SUM(r.quantity), 0)
+        FROM stock_out_record r
+        INNER JOIN small_part p ON r.part_id = p.id
+        WHERE p.part_type = #{partType}
+          AND r.production_line = #{productionLine}
+          AND r.create_time &gt;= #{startTime}
+          AND r.create_time &lt;= #{endTime}
+    </select>
+
+</mapper>

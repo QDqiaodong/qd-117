@@ -125,6 +125,36 @@
         <el-button type="primary" @click="errorDialogVisible = false">我知道了，去修改</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="quotaDialogVisible" title="领用配额超额" width="680px" :close-on-click-modal="true" top="8vh">
+      <el-alert type="error" show-icon :closable="false" style="margin-bottom: 16px;">
+        领用数量超出当前季度配额（{{ quotaCheckResult.quarter }} / {{ quotaCheckResult.productionLine }}），请调整后再出库。
+      </el-alert>
+      <el-table :data="quotaCheckResult.details" border size="small">
+        <el-table-column prop="partType" label="小件类型" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.partType === '顶针' ? 'primary' : 'success'" size="small">{{ row.partType }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="配额上限" width="100" align="center">
+          <template #default="{ row }">{{ row.configured ? row.maxQuantity : '未配置' }}</template>
+        </el-table-column>
+        <el-table-column prop="usedQuantity" label="已领用" width="90" align="center" />
+        <el-table-column label="配额剩余" width="100" align="center">
+          <template #default="{ row }">{{ row.configured ? row.remainingQuantity : '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="requestedQuantity" label="本次申请" width="100" align="center" />
+        <el-table-column label="超出数量" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.exceeded" type="danger" size="small">+{{ row.exceededQuantity }}</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button type="primary" @click="quotaDialogVisible = false">我知道了，去调整</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -133,7 +163,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
-import { stockOut, getStockOutPage, getPartList } from '@/api'
+import { stockOut, getStockOutPage, getPartList, checkLineQuota } from '@/api'
 
 const submitting = ref(false)
 const loading = ref(false)
@@ -141,6 +171,8 @@ const recordData = ref([])
 const recordTotal = ref(0)
 const errorDialogVisible = ref(false)
 const validationErrors = ref([])
+const quotaDialogVisible = ref(false)
+const quotaCheckResult = ref({ details: [] })
 const fieldLabelMap = {
   partId: '选择零件',
   quantity: '领用数量'
@@ -268,6 +300,19 @@ const submit = async () => {
     ElMessage.warning('请至少选择一个零件并填写领用数量')
     return
   }
+
+  try {
+    const quotaRes = await checkLineQuota({ productionLine: form.productionLine, items: validItems })
+    if (!quotaRes.data.passed) {
+      quotaCheckResult.value = quotaRes.data
+      quotaDialogVisible.value = true
+      return
+    }
+  } catch (e) {
+    console.error(e)
+    return
+  }
+
   try {
     await ElMessageBox.confirm(`确认出库 ${validItems.length} 条记录？`, '确认')
     submitting.value = true

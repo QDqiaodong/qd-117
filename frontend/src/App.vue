@@ -40,6 +40,10 @@
             <el-icon><MinusBox /></el-icon>
             <span>产线领用出库</span>
           </el-menu-item>
+          <el-menu-item index="/line-quota">
+            <el-icon><GoldMedal /></el-icon>
+            <span>产线领用配额</span>
+          </el-menu-item>
           <el-menu-item index="/stock-check">
             <el-icon><Finished /></el-icon>
             <span>季度库存清点</span>

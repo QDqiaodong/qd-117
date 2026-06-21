@@ -169,3 +169,71 @@ export const scrap = (data) => {
     data
   })
 }
+
+export const getLineQuotaPage = (params) => {
+  return request({
+    url: '/line-quota/page',
+    method: 'get',
+    params
+  })
+}
+
+export const getLineQuotaList = () => {
+  return request({
+    url: '/line-quota/list',
+    method: 'get'
+  })
+}
+
+export const getCurrentQuarter = () => {
+  return request({
+    url: '/line-quota/current-quarter',
+    method: 'get'
+  })
+}
+
+export const getLineQuotaEnums = () => {
+  return request({
+    url: '/line-quota/enums',
+    method: 'get'
+  })
+}
+
+export const checkLineQuota = (data) => {
+  return request({
+    url: '/line-quota/check',
+    method: 'post',
+    data
+  })
+}
+
+export const createLineQuota = (data) => {
+  return request({
+    url: '/line-quota',
+    method: 'post',
+    data
+  })
+}
+
+export const updateLineQuota = (data) => {
+  return request({
+    url: '/line-quota',
+    method: 'put',
+    data
+  })
+}
+
+export const deleteLineQuota = (id) => {
+  return request({
+    url: `/line-quota/${id}`,
+    method: 'delete'
+  })
+}
+
+export const recalculateLineQuota = (params) => {
+  return request({
+    url: '/line-quota/recalculate',
+    method: 'post',
+    params
+  })
+}

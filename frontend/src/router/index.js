@@ -32,6 +32,12 @@ const routes = [
     meta: { title: '产线领用出库' }
   },
   {
+    path: '/line-quota',
+    name: 'LineQuota',
+    component: () => import('@/views/LineQuota.vue'),
+    meta: { title: '产线领用配额' }
+  },
+  {
     path: '/stock-check',
     name: 'StockCheck',
     component: () => import('@/views/StockCheck.vue'),
