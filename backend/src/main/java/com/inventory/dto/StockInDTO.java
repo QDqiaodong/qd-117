@@ -1,6 +1,8 @@
 package com.inventory.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -10,6 +12,7 @@ import java.util.List;
 public class StockInDTO {
 
     @NotNull(message = "入库明细不能为空")
+    @NotEmpty(message = "入库明细不能为空")
     private List<StockInItem> items;
 
     @NotBlank(message = "操作人不能为空")
@@ -32,6 +35,7 @@ public class StockInDTO {
         private String shelfNo;
 
         @NotNull(message = "入库数量不能为空")
+        @Min(value = 1, message = "入库数量必须大于0")
         private Integer quantity;
 
         private String unit;

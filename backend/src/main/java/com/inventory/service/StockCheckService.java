@@ -163,6 +163,15 @@ public class StockCheckService extends ServiceImpl<StockCheckRecordMapper, Stock
 
     @Transactional(rollbackFor = Exception.class)
     public StockCheckResultVO checkStock(StockCheckDTO dto) {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BusinessException("盘点明细不能为空");
+        }
+        for (StockCheckDTO.StockCheckItem item : dto.getItems()) {
+            if (item.getActualQuantity() == null || item.getActualQuantity() < 0) {
+                throw new BusinessException("实际库存数量不能为负数，零件ID：" + item.getPartId());
+            }
+        }
+
         StockCheckResultVO result = new StockCheckResultVO();
         List<StockCheckRecord> addedRecords = new ArrayList<>();
         List<StockCheckRecord> duplicateRecords = new ArrayList<>();

@@ -36,6 +36,15 @@ public class ScrapService extends ServiceImpl<ScrapRecordMapper, ScrapRecord> {
 
     @Transactional(rollbackFor = Exception.class)
     public List<ScrapRecord> scrap(ScrapDTO dto) {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BusinessException("报废明细不能为空");
+        }
+        for (ScrapDTO.ScrapItem item : dto.getItems()) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException("报废数量必须大于0，零件ID：" + item.getPartId());
+            }
+        }
+
         List<ScrapRecord> records = new ArrayList<>();
 
         Map<Long, Integer> partTotalQtyMap = new HashMap<>();

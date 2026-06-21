@@ -1,6 +1,8 @@
 package com.inventory.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -10,6 +12,7 @@ import java.util.List;
 public class StockOutDTO {
 
     @NotNull(message = "出库明细不能为空")
+    @NotEmpty(message = "出库明细不能为空")
     private List<StockOutItem> items;
 
     @NotBlank(message = "领用产线不能为空")
@@ -29,6 +32,7 @@ public class StockOutDTO {
         private Long partId;
 
         @NotNull(message = "领用数量不能为空")
+        @Min(value = 1, message = "领用数量必须大于0")
         private Integer quantity;
     }
 }

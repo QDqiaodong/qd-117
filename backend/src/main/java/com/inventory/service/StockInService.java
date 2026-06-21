@@ -38,6 +38,15 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
 
     @Transactional(rollbackFor = Exception.class)
     public List<StockInRecord> stockIn(StockInDTO dto) {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BusinessException("入库明细不能为空");
+        }
+        for (StockInDTO.StockInItem item : dto.getItems()) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException("入库数量必须大于0，型号：" + item.getPartModel());
+            }
+        }
+
         StockInValidationVO validation = validate(dto);
         if (!validation.isValid()) {
             String errorMsg = String.join("; ", validation.getErrors());

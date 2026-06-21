@@ -37,6 +37,15 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
 
     @Transactional(rollbackFor = Exception.class)
     public List<StockOutRecord> stockOut(StockOutDTO dto) {
+        if (dto.getItems() == null || dto.getItems().isEmpty()) {
+            throw new BusinessException("出库明细不能为空");
+        }
+        for (StockOutDTO.StockOutItem item : dto.getItems()) {
+            if (item.getQuantity() == null || item.getQuantity() <= 0) {
+                throw new BusinessException("出库数量必须大于0，零件ID：" + item.getPartId());
+            }
+        }
+
         List<StockOutRecord> records = new ArrayList<>();
 
         Map<Long, Integer> partTotalQtyMap = new HashMap<>();
