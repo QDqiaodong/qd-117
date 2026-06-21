@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -47,6 +49,12 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             }
         }
 
+        for (StockInDTO.StockInItem item : dto.getItems()) {
+            trimItem(item);
+        }
+
+        checkStockInConflicts(dto.getItems());
+
         StockInValidationVO validation = validate(dto);
         if (!validation.isValid()) {
             String errorMsg = String.join("; ", validation.getErrors());
@@ -55,24 +63,6 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
 
         List<StockInRecord> records = new ArrayList<>();
         for (StockInDTO.StockInItem item : dto.getItems()) {
-            if (item.getPartModel() != null) {
-                item.setPartModel(item.getPartModel().trim());
-            }
-            if (item.getPartName() != null) {
-                item.setPartName(item.getPartName().trim());
-            }
-            if (item.getShelfNo() != null) {
-                item.setShelfNo(item.getShelfNo().trim());
-            }
-            if (item.getUnit() != null) {
-                item.setUnit(item.getUnit().trim());
-            }
-            if (item.getRemark() != null) {
-                item.setRemark(item.getRemark().trim());
-            }
-            if (item.getSpecParams() != null) {
-                item.setSpecParams(item.getSpecParams().trim());
-            }
             SmallPart existingPart = smallPartService.getByModel(item.getPartModel());
             String oldShelfNo = existingPart != null ? existingPart.getShelfNo() : null;
             String oldPartTypeForUpdate = existingPart != null ? existingPart.getPartType() : item.getPartType();
@@ -169,5 +159,74 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                     part.getPartModel(), item.getQuantity(), item.getShelfNo(), dto.getOperator());
         }
         return records;
+    }
+
+    private void trimItem(StockInDTO.StockInItem item) {
+        if (item.getPartModel() != null) {
+            item.setPartModel(item.getPartModel().trim());
+        }
+        if (item.getPartName() != null) {
+            item.setPartName(item.getPartName().trim());
+        }
+        if (item.getPartType() != null) {
+            item.setPartType(item.getPartType().trim());
+        }
+        if (item.getShelfNo() != null) {
+            item.setShelfNo(item.getShelfNo().trim());
+        }
+        if (item.getUnit() != null) {
+            item.setUnit(item.getUnit().trim());
+        }
+        if (item.getRemark() != null) {
+            item.setRemark(item.getRemark().trim());
+        }
+        if (item.getSpecParams() != null) {
+            item.setSpecParams(item.getSpecParams().trim());
+        }
+    }
+
+    private void checkStockInConflicts(List<StockInDTO.StockInItem> items) {
+        List<String> conflicts = new ArrayList<>();
+        Map<String, StockInDTO.StockInItem> batchFirstSeen = new HashMap<>();
+        for (StockInDTO.StockInItem item : items) {
+            String model = item.getPartModel();
+            SmallPart existing = smallPartService.getByModel(model);
+            String refName;
+            String refType;
+            String refShelf;
+            if (existing != null) {
+                refName = existing.getPartName();
+                refType = existing.getPartType();
+                refShelf = existing.getShelfNo();
+            } else if (batchFirstSeen.containsKey(model)) {
+                StockInDTO.StockInItem first = batchFirstSeen.get(model);
+                refName = first.getPartName();
+                refType = first.getPartType();
+                refShelf = first.getShelfNo();
+            } else {
+                batchFirstSeen.put(model, item);
+                continue;
+            }
+            List<String> diffs = new ArrayList<>();
+            String name = item.getPartName();
+            String type = item.getPartType();
+            String shelf = item.getShelfNo();
+            if (name != null && !name.isEmpty() && refName != null && !refName.isEmpty() && !name.equals(refName)) {
+                diffs.add("名称不一致(库存:" + refName + " ≠ 本次:" + name + ")");
+            }
+            if (type != null && !type.isEmpty() && refType != null && !refType.isEmpty() && !type.equals(refType)) {
+                diffs.add("类型不一致(库存:" + refType + " ≠ 本次:" + type + ")");
+            }
+            if (shelf != null && !shelf.isEmpty() && refShelf != null && !refShelf.isEmpty() && !shelf.equals(refShelf)) {
+                diffs.add("货架不一致(库存:" + refShelf + " ≠ 本次:" + shelf + ")");
+            }
+            if (!diffs.isEmpty()) {
+                conflicts.add("型号[" + model + "] " + String.join("，", diffs));
+            }
+        }
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("入库冲突：同型号但名称/类型/货架不一致，已拒绝累加库存，请核对后重新录入。"
+                    + String.join("；", conflicts));
+        }
     }
 }
