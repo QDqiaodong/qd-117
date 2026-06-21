@@ -7,6 +7,7 @@
       <el-button type="danger" size="small" @click="clearAll" v-if="showClear">
         <el-icon><Delete /></el-icon> 清空全部
       </el-button>
+      <slot name="toolbar" :unfilled-count="unfilledCount" :total-count="displayData.length"></slot>
       <div class="error-summary" v-if="errorRows.length > 0">
         <el-tag type="danger">
           <el-icon><Warning /></el-icon>
@@ -17,7 +18,7 @@
 
     <el-table
       ref="tableRef"
-      :data="tableData"
+      :data="displayData"
       border
       style="width: 100%; margin-top: 12px;"
       :row-class-name="rowClassName"
@@ -34,7 +35,10 @@
         align="center"
       >
         <template #default="{ row, $index }">
-          <template v-if="col.type === 'select'">
+          <template v-if="col.type === 'readonly'">
+            <span class="readonly-cell">{{ row[col.prop] !== undefined && row[col.prop] !== null ? row[col.prop] : '-' }}</span>
+          </template>
+          <template v-else-if="col.type === 'select'">
             <el-select
               v-model="row[col.prop]"
               placeholder="请选择"
@@ -54,11 +58,11 @@
           <template v-else-if="col.type === 'number'">
             <el-input-number
               v-model="row[col.prop]"
-              :min="col.min !== undefined ? col.min : 1"
+              :min="col.min !== undefined ? col.min : 0"
               size="small"
               style="width: 100%;"
               :class="{ 'cell-error': hasError($index, col.prop) }"
-              @change="handleCellChange($index, col.prop)"
+              @change="handleInputNumberChange($index, col.prop)"
               controls-position="right"
             />
           </template>
@@ -113,6 +117,18 @@ const props = defineProps({
   validators: {
     type: Object,
     default: () => ({})
+  },
+  rowExtraClassFn: {
+    type: Function,
+    default: null
+  },
+  rowFilterFn: {
+    type: Function,
+    default: null
+  },
+  rowUnfilledFn: {
+    type: Function,
+    default: null
   }
 })
 
@@ -124,8 +140,9 @@ const highlightRowIndex = ref(-1)
 let highlightTimer = null
 
 const createEmptyRow = () => {
-  const row = {}
+  const row = { _touched: false }
   props.columns.forEach(col => {
+    if (col.type === 'readonly') return
     row[col.prop] = col.defaultValue !== undefined ? col.defaultValue : ''
   })
   return row
@@ -203,7 +220,21 @@ const clearAll = () => {
   emitValidationChange()
 }
 
+const markRowTouched = (index) => {
+  const row = tableData.value[index]
+  if (row) {
+    row._touched = true
+  }
+}
+
 const handleCellChange = (index, prop) => {
+  markRowTouched(index)
+  validateCell(index, prop)
+  emitChange()
+}
+
+const handleInputNumberChange = (index, prop) => {
+  markRowTouched(index)
   validateCell(index, prop)
   emitChange()
 }
@@ -265,6 +296,20 @@ const errorRows = computed(() => {
   return Object.keys(rowErrors).map(Number).sort((a, b) => a - b)
 })
 
+const displayData = computed(() => {
+  if (!props.rowFilterFn) {
+    return tableData.value
+  }
+  return tableData.value.filter((row, index) => props.rowFilterFn(row, index))
+})
+
+const unfilledCount = computed(() => {
+  if (!props.rowUnfilledFn) {
+    return 0
+  }
+  return tableData.value.filter((row, index) => props.rowUnfilledFn(row, index)).length
+})
+
 const getAllErrors = () => {
   const errors = []
   Object.keys(rowErrors).forEach(rowIndex => {
@@ -293,7 +338,7 @@ const cellClassName = ({ rowIndex, column }) => {
   return ''
 }
 
-const rowClassName = ({ rowIndex }) => {
+const rowClassName = ({ row, rowIndex }) => {
   const base = rowIndex % 2 === 0 ? '' : 'row-alt'
   const classes = [base]
   if (rowErrors[rowIndex]) {
@@ -301,6 +346,15 @@ const rowClassName = ({ rowIndex }) => {
   }
   if (highlightRowIndex.value === rowIndex) {
     classes.push('row-highlight')
+  }
+  if (props.rowUnfilledFn && props.rowUnfilledFn(row, rowIndex)) {
+    classes.push('row-unfilled')
+  }
+  if (props.rowExtraClassFn) {
+    const extra = props.rowExtraClassFn(row, rowIndex)
+    if (extra) {
+      classes.push(extra)
+    }
   }
   return classes.join(' ').trim()
 }
@@ -353,6 +407,37 @@ defineExpose({
   background-color: #fef0f0 !important;
 }
 
+:deep(.row-unfilled) {
+  background-color: #fff7e6 !important;
+
+  &.row-alt {
+    background-color: #fff1d6 !important;
+  }
+
+  td:first-child .cell::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #e6a23c;
+    margin-right: 6px;
+    vertical-align: middle;
+    animation: unfilledDot 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes unfilledDot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
 :deep(.row-highlight) {
   background-color: #fff7e6 !important;
   animation: rowHighlightPulse 1s ease-in-out infinite alternate;
@@ -369,6 +454,16 @@ defineExpose({
 
 :deep(.cell-error-cell) {
   background-color: #fef0f0 !important;
+}
+
+:deep(.readonly-cell) {
+  color: #606266;
+  font-weight: 500;
+  background: #f5f7fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  min-width: 50px;
 }
 
 :deep(.cell-error) {

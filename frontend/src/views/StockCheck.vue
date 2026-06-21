@@ -37,8 +37,38 @@
       :columns="columns"
       :initial-data="form.items"
       :validators="validators"
+      :row-unfilled-fn="isRowUnfilled"
+      :row-filter-fn="rowFilterFn"
       @change="onItemsChange"
-    />
+    >
+      <template #toolbar="{ unfilledCount, totalCount }">
+        <el-tag v-if="unfilledCount > 0" type="warning" effect="dark" class="unfilled-tag">
+          <el-icon><WarningFilled /></el-icon>
+          未录入实物数量：{{ unfilledCount }} / {{ totalCount }} 项
+        </el-tag>
+        <el-tag v-else type="success" effect="light">
+          <el-icon><CircleCheckFilled /></el-icon>
+          全部已录入（{{ totalCount }} 项）
+        </el-tag>
+        <el-button
+          v-if="unfilledCount > 0"
+          type="warning"
+          size="small"
+          plain
+          @click="markAllTouched"
+          style="margin-left: 8px;"
+        >
+          <el-icon><Select /></el-icon> 全部标记已录入
+        </el-button>
+        <el-switch
+          v-model="showOnlyUnfilled"
+          active-text="只看未录入"
+          inactive-text="显示全部"
+          :disabled="totalCount === 0"
+          style="margin-left: 12px;"
+        />
+      </template>
+    </BatchInputTable>
 
     <div style="margin-top: 20px; text-align: center;">
       <el-button type="primary" size="large" @click="submit" :loading="submitting">
@@ -225,9 +255,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Aim, Warning, Camera, Check, RefreshLeft, List, Search } from '@element-plus/icons-vue'
+import { Aim, Warning, WarningFilled, Camera, Check, RefreshLeft, List, Search, CircleCheckFilled, Select } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
 import {
   stockCheck,
@@ -295,6 +325,21 @@ const recordPage = reactive({
 })
 
 const batchTableRef = ref(null)
+const showOnlyUnfilled = ref(false)
+
+const isRowUnfilled = (row) => {
+  if (!row || !row.partId) return false
+  return row._touched !== true
+}
+
+const rowFilterFn = (row) => {
+  if (!showOnlyUnfilled.value) return true
+  return isRowUnfilled(row)
+}
+
+const unfilledCount = computed(() => {
+  return form.items.filter(r => isRowUnfilled(r)).length
+})
 
 const groupedValidationErrors = computed(() => {
   const map = new Map()
@@ -324,14 +369,10 @@ const columns = reactive([
     minWidth: 260,
     options: []
   },
+  { prop: 'systemQuantity', label: '快照账面', type: 'readonly', width: 110 },
   { prop: 'actualQuantity', label: '实际库存', type: 'number', min: 0, width: 120 },
   { prop: 'remark', label: '差异原因备注', placeholder: '有差异时必填', minWidth: 200 }
 ])
-
-const getSnapshotQty = (partId) => {
-  const snap = snapshotItems.value.find(s => s.partId === partId)
-  return snap ? snap.frozenStockQuantity : null
-}
 
 const validators = {
   partId: (value) => {
@@ -347,11 +388,13 @@ const validators = {
     return { valid: true }
   },
   remark: (value, row) => {
-    const snapQty = getSnapshotQty(row.partId)
+    const snapQty = row.systemQuantity !== undefined && row.systemQuantity !== null
+      ? row.systemQuantity
+      : (snapshotItems.value.find(s => s.partId === row.partId)?.frozenStockQuantity ?? null)
     if (snapQty === null) {
       return { valid: true }
     }
-    const diff = row.actualQuantity - snapQty
+    const diff = (row.actualQuantity ?? 0) - snapQty
     if (diff !== 0 && (!value || value.trim() === '')) {
       return { valid: false, message: '有差异时请填写原因' }
     }
@@ -411,8 +454,10 @@ const loadFromSnapshot = async () => {
       .filter(p => p.frozenStockQuantity > 0)
       .map(p => ({
         partId: p.partId,
+        systemQuantity: p.frozenStockQuantity,
         actualQuantity: p.frozenStockQuantity,
-        remark: ''
+        remark: '',
+        _touched: false
       }))
     ElMessage.success(`已从快照载入 ${form.items.length} 项库存`)
   } catch (e) {
@@ -439,6 +484,27 @@ const onItemsChange = (items) => {
   form.items = items
 }
 
+const markAllTouched = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确认将全部 ${unfilledCount.value} 项标记为"已录入实物数量"？\n建议先确认实物数量与账面一致后再操作。`,
+      '批量标记已录入',
+      { confirmButtonText: '确认标记', cancelButtonText: '取消', type: 'warning' }
+    )
+    form.items.forEach(row => {
+      if (row.partId) {
+        row._touched = true
+      }
+    })
+    showOnlyUnfilled.value = false
+    ElMessage.success('已全部标记为已录入')
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+    }
+  }
+}
+
 const submit = async () => {
   if (!form.quarter.trim()) {
     ElMessage.warning('请输入盘点季度，如：2024-Q1')
@@ -460,11 +526,39 @@ const submit = async () => {
     return
   }
 
-  const validItems = form.items.filter(i => i.partId && i.actualQuantity >= 0)
-  if (validItems.length === 0) {
+  const rowsWithPart = form.items.filter(i => i.partId && i.actualQuantity >= 0)
+  if (rowsWithPart.length === 0) {
     ElMessage.warning('请至少选择一个零件进行盘点')
     return
   }
+
+  const unfilledItems = rowsWithPart.filter(i => isRowUnfilled(i))
+  const validItems = rowsWithPart.map(i => ({
+    partId: i.partId,
+    actualQuantity: i.actualQuantity,
+    remark: i.remark || ''
+  }))
+  if (unfilledItems.length > 0) {
+    showOnlyUnfilled.value = true
+    try {
+      await ElMessageBox.confirm(
+        `检测到有 ${unfilledItems.length} 项顶针/垫片尚未录入实物数量，已为您过滤显示。\n是否忽略这些未录入项，直接提交已录入的 ${validItems.length - unfilledItems.length} 条？\n\n建议：先完成全部实物盘点，再行提交。`,
+        '存在未录入实物数量的行',
+        {
+          confirmButtonText: '忽略未录入，提交已录入的',
+          cancelButtonText: '返回继续录入',
+          type: 'warning',
+          distinguishCancelAndClose: true
+        }
+      )
+    } catch (e) {
+      if (e === 'cancel' || e === 'close') {
+        ElMessage.info('请继续完成未录入项的实物数量录入')
+        return
+      }
+    }
+  }
+
   try {
     await ElMessageBox.confirm(`确认保存 ${validItems.length} 条盘点记录？`, '确认')
     submitting.value = true
@@ -511,6 +605,7 @@ const resetForm = () => {
   snapshotInfo.totalCount = 0
   snapshotInfo.pinCount = 0
   snapshotInfo.shimCount = 0
+  showOnlyUnfilled.value = false
 }
 
 const loadRecords = async () => {
@@ -574,6 +669,14 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+.unfilled-tag {
+  :deep(.el-tag__content) {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+}
+
 .validation-errors {
   max-height: 50vh;
   overflow-y: auto;
