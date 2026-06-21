@@ -237,3 +237,63 @@ export const recalculateLineQuota = (params) => {
     params
   })
 }
+
+export const getScrapReasonPage = (params) => {
+  return request({
+    url: '/scrap-reason/page',
+    method: 'get',
+    params
+  })
+}
+
+export const getScrapReasonList = () => {
+  return request({
+    url: '/scrap-reason/list',
+    method: 'get'
+  })
+}
+
+export const getScrapReasonEnabled = () => {
+  return request({
+    url: '/scrap-reason/enabled',
+    method: 'get'
+  })
+}
+
+export const getScrapReasonByPartType = (partType) => {
+  return request({
+    url: '/scrap-reason/by-part-type',
+    method: 'get',
+    params: { partType }
+  })
+}
+
+export const createScrapReason = (data) => {
+  return request({
+    url: '/scrap-reason',
+    method: 'post',
+    data
+  })
+}
+
+export const updateScrapReason = (data) => {
+  return request({
+    url: '/scrap-reason',
+    method: 'put',
+    data
+  })
+}
+
+export const deleteScrapReason = (id) => {
+  return request({
+    url: `/scrap-reason/${id}`,
+    method: 'delete'
+  })
+}
+
+export const toggleScrapReasonStatus = (id) => {
+  return request({
+    url: `/scrap-reason/toggle-status/${id}`,
+    method: 'post'
+  })
+}

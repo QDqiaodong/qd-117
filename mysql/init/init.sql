@@ -123,3 +123,30 @@ CREATE TABLE IF NOT EXISTS line_quota (
     INDEX idx_quarter (quarter),
     INDEX idx_production_line (production_line)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产线领用配额表';
+
+CREATE TABLE IF NOT EXISTS scrap_reason (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    reason_name VARCHAR(100) NOT NULL COMMENT '原因名称：顶针弯曲/针尖磨损/垫片变形/孔径偏差等',
+    reason_code VARCHAR(50) NOT NULL COMMENT '原因编码',
+    part_type VARCHAR(50) NOT NULL COMMENT '适用零件类型：顶针/限位垫片/全部',
+    sort INT NOT NULL DEFAULT 0 COMMENT '排序号，数字越小越靠前',
+    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_reason_code (reason_code),
+    UNIQUE KEY uk_reason_name (reason_name),
+    INDEX idx_part_type (part_type),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='破损原因字典表';
+
+INSERT INTO scrap_reason (reason_code, reason_name, part_type, sort, status) VALUES
+('PIN_BEND', '顶针弯曲', '顶针', 1, 1),
+('PIN_WEAR', '针尖磨损', '顶针', 2, 1),
+('PIN_BREAK', '顶针断裂', '顶针', 3, 1),
+('PIN_OTHER', '顶针其他', '顶针', 4, 1),
+('SHIM_DEFORM', '垫片变形', '限位垫片', 5, 1),
+('HOLE_DEVIATION', '孔径偏差', '限位垫片', 6, 1),
+('SHIM_WEAR', '垫片磨损', '限位垫片', 7, 1),
+('SHIM_OTHER', '垫片其他', '限位垫片', 8, 1),
+('COMMON_OTHER', '其他', '全部', 99, 1);

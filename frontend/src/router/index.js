@@ -56,6 +56,12 @@ const routes = [
     meta: { title: '破损零件报废' }
   },
   {
+    path: '/scrap-reason',
+    name: 'ScrapReason',
+    component: () => import('@/views/ScrapReason.vue'),
+    meta: { title: '破损原因字典' }
+  },
+  {
     path: '/records',
     name: 'Records',
     component: () => import('@/views/Records.vue'),

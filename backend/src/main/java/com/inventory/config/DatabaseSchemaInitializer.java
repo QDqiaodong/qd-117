@@ -20,6 +20,7 @@ public class DatabaseSchemaInitializer {
     public void initialize() {
         ensureShelfCapacityTable();
         ensureLineQuotaTable();
+        ensureScrapReasonTable();
     }
 
     private void ensureShelfCapacityTable() {
@@ -59,6 +60,68 @@ public class DatabaseSchemaInitializer {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产线领用配额表'
                 """;
         executeDdl("line_quota", ddl);
+    }
+
+    private void ensureScrapReasonTable() {
+        String ddl = """
+                CREATE TABLE IF NOT EXISTS scrap_reason (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    reason_name VARCHAR(100) NOT NULL COMMENT '原因名称：顶针弯曲/针尖磨损/垫片变形/孔径偏差等',
+                    reason_code VARCHAR(50) NOT NULL COMMENT '原因编码',
+                    part_type VARCHAR(50) NOT NULL COMMENT '适用零件类型：顶针/限位垫片/全部',
+                    sort INT NOT NULL DEFAULT 0 COMMENT '排序号，数字越小越靠前',
+                    status TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0-禁用，1-启用',
+                    remark VARCHAR(500) COMMENT '备注',
+                    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_reason_code (reason_code),
+                    UNIQUE KEY uk_reason_name (reason_name),
+                    INDEX idx_part_type (part_type),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='破损原因字典表'
+                """;
+        executeDdl("scrap_reason", ddl);
+        initDefaultScrapReasons();
+    }
+
+    private void initDefaultScrapReasons() {
+        String checkSql = "SELECT COUNT(*) FROM scrap_reason";
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             var rs = statement.executeQuery(checkSql)) {
+            if (rs.next() && rs.getInt(1) > 0) {
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("检查破损原因数据失败", e);
+            return;
+        }
+
+        String[][] defaults = {
+                {"PIN_BEND", "顶针弯曲", "顶针", "1"},
+                {"PIN_WEAR", "针尖磨损", "顶针", "2"},
+                {"PIN_BREAK", "顶针断裂", "顶针", "3"},
+                {"PIN_OTHER", "顶针其他", "顶针", "4"},
+                {"SHIM_DEFORM", "垫片变形", "限位垫片", "5"},
+                {"HOLE_DEVIATION", "孔径偏差", "限位垫片", "6"},
+                {"SHIM_WEAR", "垫片磨损", "限位垫片", "7"},
+                {"SHIM_OTHER", "垫片其他", "限位垫片", "8"},
+                {"COMMON_OTHER", "其他", "全部", "99"}
+        };
+
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            for (String[] row : defaults) {
+                String insert = String.format(
+                        "INSERT INTO scrap_reason (reason_code, reason_name, part_type, sort, status, create_time, update_time) " +
+                                "VALUES ('%s', '%s', '%s', %s, 1, NOW(), NOW())",
+                        row[0], row[1], row[2], row[3]);
+                statement.execute(insert);
+            }
+            log.info("初始化破损原因字典默认数据完成");
+        } catch (Exception e) {
+            log.warn("初始化破损原因默认数据失败", e);
+        }
     }
 
     private void executeDdl(String tableName, String ddl) {

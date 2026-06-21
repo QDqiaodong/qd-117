@@ -43,10 +43,7 @@
       <div class="toolbar-left">
         <el-input v-model="searchForm.partModel" placeholder="零件型号" clearable style="width: 200px;" />
         <el-select v-model="searchForm.scrapReason" placeholder="报废原因" clearable style="width: 160px;">
-          <el-option label="变形" value="变形" />
-          <el-option label="断裂" value="断裂" />
-          <el-option label="磨损" value="磨损" />
-          <el-option label="其他" value="其他" />
+          <el-option v-for="r in scrapReasonList" :key="r.id" :label="r.reasonName" :value="r.reasonName" />
         </el-select>
         <el-date-picker
           v-model="searchForm.dateRange"
@@ -66,9 +63,9 @@
     <el-table :data="recordData" stripe border v-loading="loading" style="width: 100%;">
       <el-table-column prop="partModel" label="零件型号" min-width="140" />
       <el-table-column prop="quantity" label="报废数量" width="100" align="center" />
-      <el-table-column prop="scrapReason" label="报废原因" width="100" align="center">
+      <el-table-column prop="scrapReason" label="报废原因" width="120" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.scrapReason === '断裂' ? 'danger' : (row.scrapReason === '变形' ? 'warning' : 'info')">
+          <el-tag :type="scrapReasonTagType(row.scrapReason)">
             {{ row.scrapReason }}
           </el-tag>
         </template>
@@ -121,7 +118,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
-import { scrap, getScrapPage, getPartList } from '@/api'
+import { scrap, getScrapPage, getPartList, getScrapReasonEnabled } from '@/api'
 
 const submitting = ref(false)
 const loading = ref(false)
@@ -135,6 +132,15 @@ const fieldLabelMap = {
   scrapReason: '报废原因'
 }
 const partList = ref([])
+const scrapReasonList = ref([])
+
+const scrapReasonTagType = (reason) => {
+  if (!reason) return 'info'
+  if (reason.includes('断裂') || reason.includes('弯曲') || reason.includes('变形')) return 'danger'
+  if (reason.includes('磨损') || reason.includes('偏差')) return 'warning'
+  if (reason.includes('其他')) return 'info'
+  return 'primary'
+}
 
 const form = reactive({
   operator: '',
@@ -188,13 +194,16 @@ const columns = reactive([
     prop: 'scrapReason',
     label: '报废原因',
     type: 'select',
-    width: 120,
-    options: [
-      { label: '变形', value: '变形' },
-      { label: '断裂', value: '断裂' },
-      { label: '磨损', value: '磨损' },
-      { label: '其他', value: '其他' }
-    ]
+    width: 140,
+    optionsFn: (row) => {
+      const part = partList.value.find(p => p.id === row.partId)
+      if (!part) {
+        return scrapReasonList.value.map(r => ({ label: r.reasonName, value: r.reasonName }))
+      }
+      return scrapReasonList.value
+        .filter(r => r.partType === part.partType || r.partType === '全部')
+        .map(r => ({ label: r.reasonName, value: r.reasonName }))
+    }
   }
 ])
 
@@ -242,6 +251,15 @@ const loadPartList = async () => {
       label: `${p.partModel} - ${p.partName} (库存:${p.stockQuantity})`,
       value: p.id
     }))
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+const loadScrapReasons = async () => {
+  try {
+    const res = await getScrapReasonEnabled()
+    scrapReasonList.value = res.data
   } catch (e) {
     console.error(e)
   }
@@ -325,6 +343,7 @@ const loadRecords = async () => {
 
 onMounted(() => {
   loadPartList()
+  loadScrapReasons()
   loadRecords()
 })
 </script>

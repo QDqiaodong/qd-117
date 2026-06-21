@@ -48,7 +48,7 @@
               @change="handleCellChange($index, col.prop)"
             >
               <el-option
-                v-for="opt in col.options"
+                v-for="opt in (col.optionsFn ? col.optionsFn(row, $index) : col.options)"
                 :key="opt.value"
                 :label="opt.label"
                 :value="opt.value"
