@@ -226,6 +226,38 @@ const columns = [
   { prop: 'remark', label: '备注', placeholder: '可选', minWidth: 150 }
 ]
 
+const parseBoxRange = (start, end) => {
+  const result = []
+  start = start ? start.trim() : ''
+  end = end ? end.trim() : ''
+  if (!start || !end) return result
+  const pattern = /^(.*?)(\d+)$/
+  const startMatch = start.match(pattern)
+  const endMatch = end.match(pattern)
+  if (!startMatch || !endMatch) {
+    result.push(start)
+    if (start !== end) result.push(end)
+    return result
+  }
+  const prefix = startMatch[1]
+  const endPrefix = endMatch[1]
+  if (prefix !== endPrefix) {
+    result.push(start)
+    if (start !== end) result.push(end)
+    return result
+  }
+  let startNum = parseInt(startMatch[2])
+  let endNum = parseInt(endMatch[2])
+  const numWidth = startMatch[2].length
+  if (startNum > endNum) {
+    [startNum, endNum] = [endNum, startNum]
+  }
+  for (let i = startNum; i <= endNum; i++) {
+    result.push(prefix + String(i).padStart(numWidth, '0'))
+  }
+  return result
+}
+
 const validators = {
   partModel: (value) => {
     const trimmed = value ? value.trim() : ''
@@ -259,13 +291,38 @@ const validators = {
     }
     return { valid: true }
   },
-  boxNoStart: (value, row) => {
+  boxNoStart: (value, row, rowIndex, allRows) => {
     if (row && row.partType !== '顶针') {
       return { valid: true }
     }
     const trimmed = value ? value.trim() : ''
     if (!trimmed) {
       return { valid: false, message: '顶针类型请填写盒号起始' }
+    }
+    if (allRows && row && row.partType === '顶针') {
+      const start = trimmed
+      const end = (row.boxNoEnd && row.boxNoEnd.trim()) || start
+      const curBoxes = new Set(parseBoxRange(start, end))
+      const conflictMap = new Map()
+      allRows.forEach((r, idx) => {
+        if (idx === rowIndex || r.partType !== '顶针') return
+        const s = (r.boxNoStart || '').trim()
+        const e = (r.boxNoEnd && r.boxNoEnd.trim()) || s
+        if (!s || !e) return
+        parseBoxRange(s, e).forEach(bn => {
+          if (curBoxes.has(bn)) {
+            if (!conflictMap.has(bn)) conflictMap.set(bn, [])
+            conflictMap.get(bn).push(idx + 1)
+          }
+        })
+      })
+      if (conflictMap.size > 0) {
+        const conflicts = []
+        conflictMap.forEach((rows, bn) => {
+          conflicts.push(`${bn}(第${rows.join('、')}行)`)
+        })
+        return { valid: false, message: `盒号范围与其他行重复：${conflicts.join('，')}` }
+      }
     }
     return { valid: true }
   }

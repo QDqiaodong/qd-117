@@ -54,6 +54,7 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             trimItem(item);
         }
 
+        checkStockInBoxNoConflicts(dto.getItems());
         checkStockInConflicts(dto.getItems());
 
         StockInValidationVO validation = validate(dto);
@@ -246,6 +247,79 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
         if (!conflicts.isEmpty()) {
             throw new BusinessException("入库冲突：同型号但名称/类型/货架不一致，已拒绝累加库存，请核对后重新录入。"
                     + String.join("；", conflicts));
+        }
+    }
+
+    private List<String> parseBoxRange(String start, String end) {
+        List<String> result = new ArrayList<>();
+        start = start != null ? start.trim() : "";
+        end = end != null ? end.trim() : "";
+        if (start.isEmpty() || end.isEmpty()) {
+            return result;
+        }
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("^(.*?)(\\d+)$");
+        java.util.regex.Matcher startMatcher = pattern.matcher(start);
+        java.util.regex.Matcher endMatcher = pattern.matcher(end);
+        if (!startMatcher.matches() || !endMatcher.matches()) {
+            result.add(start);
+            if (!start.equals(end)) {
+                result.add(end);
+            }
+            return result;
+        }
+        String prefix = startMatcher.group(1);
+        String endPrefix = endMatcher.group(1);
+        if (!prefix.equals(endPrefix)) {
+            result.add(start);
+            if (!start.equals(end)) {
+                result.add(end);
+            }
+            return result;
+        }
+        int startNum = Integer.parseInt(startMatcher.group(2));
+        int endNum = Integer.parseInt(endMatcher.group(2));
+        int numWidth = startMatcher.group(2).length();
+        if (startNum > endNum) {
+            int tmp = startNum;
+            startNum = endNum;
+            endNum = tmp;
+        }
+        for (int i = startNum; i <= endNum; i++) {
+            result.add(prefix + String.format("%0" + numWidth + "d", i));
+        }
+        return result;
+    }
+
+    private void checkStockInBoxNoConflicts(List<StockInDTO.StockInItem> items) {
+        Map<String, List<Integer>> boxNoRowMap = new HashMap<>();
+        for (int i = 0; i < items.size(); i++) {
+            StockInDTO.StockInItem item = items.get(i);
+            int rowNum = i + 1;
+            if (!"顶针".equals(item.getPartType())) {
+                continue;
+            }
+            if (item.getBoxNoStart() == null || item.getBoxNoStart().trim().isEmpty()) {
+                continue;
+            }
+            String start = item.getBoxNoStart().trim();
+            String end = (item.getBoxNoEnd() != null && !item.getBoxNoEnd().trim().isEmpty())
+                    ? item.getBoxNoEnd().trim() : start;
+            List<String> boxNos = parseBoxRange(start, end);
+            for (String boxNo : boxNos) {
+                boxNoRowMap.computeIfAbsent(boxNo, k -> new ArrayList<>()).add(rowNum);
+            }
+        }
+        List<String> conflicts = new ArrayList<>();
+        for (Map.Entry<String, List<Integer>> entry : boxNoRowMap.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                String rows = entry.getValue().stream()
+                        .map(String::valueOf)
+                        .collect(java.util.stream.Collectors.joining("、"));
+                conflicts.add("盒号[" + entry.getKey() + "]重复出现在第" + rows + "行");
+            }
+        }
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("入库冲突：同一批次中盒号范围不能重叠，" + String.join("；", conflicts));
         }
     }
 }

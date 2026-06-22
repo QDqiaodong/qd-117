@@ -56,6 +56,8 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
             }
         }
 
+        checkDuplicateBoxNos(dto.getItems());
+
         List<StockOutRecord> records = new ArrayList<>();
 
         Map<Long, Integer> partTotalQtyMap = new HashMap<>();
@@ -122,5 +124,30 @@ public class StockOutService extends ServiceImpl<StockOutRecordMapper, StockOutR
                     part.getShelfNo(), dto.getOperator());
         }
         return records;
+    }
+
+    private void checkDuplicateBoxNos(List<StockOutDTO.StockOutItem> items) {
+        Map<String, List<Integer>> boxNoRowMap = new HashMap<>();
+        for (int i = 0; i < items.size(); i++) {
+            StockOutDTO.StockOutItem item = items.get(i);
+            int rowNum = i + 1;
+            if (item.getBoxNos() != null && !item.getBoxNos().isEmpty()) {
+                for (String boxNo : item.getBoxNos()) {
+                    boxNoRowMap.computeIfAbsent(boxNo, k -> new ArrayList<>()).add(rowNum);
+                }
+            }
+        }
+        List<String> conflicts = new ArrayList<>();
+        for (Map.Entry<String, List<Integer>> entry : boxNoRowMap.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                String rows = entry.getValue().stream()
+                        .map(String::valueOf)
+                        .collect(java.util.stream.Collectors.joining("、"));
+                conflicts.add("盒号[" + entry.getKey() + "]重复出现在第" + rows + "行");
+            }
+        }
+        if (!conflicts.isEmpty()) {
+            throw new BusinessException("出库冲突：同一盒号不能被多行重复选择，" + String.join("；", conflicts));
+        }
     }
 }

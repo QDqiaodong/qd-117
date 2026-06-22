@@ -263,10 +263,20 @@ const columns = reactive([
     type: 'select',
     multiple: true,
     minWidth: 260,
-    optionsFn: (row) => {
+    optionsFn: (row, rowIndex) => {
       if (!row || !row.partId) return []
       const boxes = availableBoxesMap[row.partId] || []
-      return boxes.map(b => ({ label: b.boxNo, value: b.boxNo }))
+      const usedBoxNosInOtherRows = new Set()
+      form.items.forEach((item, idx) => {
+        if (idx !== rowIndex && item.boxNos && Array.isArray(item.boxNos)) {
+          item.boxNos.forEach(bn => usedBoxNosInOtherRows.add(bn))
+        }
+      })
+      return boxes.map(b => ({
+        label: b.boxNo,
+        value: b.boxNo,
+        disabled: usedBoxNosInOtherRows.has(b.boxNo)
+      }))
     },
     showFn: (row) => !row || isPinPart(row.partId)
   }
@@ -280,7 +290,7 @@ const validators = {
     loadAvailableBoxes(value)
     return { valid: true }
   },
-  quantity: (value, row, rowIndex, allRows) => {
+  quantity: (value, row, _rowIndex, allRows) => {
     if (value === null || value === undefined || value <= 0) {
       return { valid: false, message: '数量必须大于0' }
     }
@@ -301,7 +311,7 @@ const validators = {
     }
     return { valid: true }
   },
-  boxNos: (value, row) => {
+  boxNos: (value, row, _rowIndex, allRows) => {
     if (!row || !row.partId) {
       return { valid: true }
     }
@@ -313,6 +323,29 @@ const validators = {
     }
     if (value.length !== row.quantity) {
       return { valid: false, message: `盒号数量(${value.length})需等于领用数量(${row.quantity})` }
+    }
+    if (allRows) {
+      const duplicateMap = new Map()
+      allRows.forEach((r, idx) => {
+        if (r.boxNos && Array.isArray(r.boxNos)) {
+          r.boxNos.forEach(bn => {
+            if (!duplicateMap.has(bn)) {
+              duplicateMap.set(bn, [])
+            }
+            duplicateMap.get(bn).push(idx + 1)
+          })
+        }
+      })
+      const duplicates = []
+      value.forEach(bn => {
+        const rows = duplicateMap.get(bn)
+        if (rows && rows.length > 1) {
+          duplicates.push(`${bn}(第${rows.join('、')}行)`)
+        }
+      })
+      if (duplicates.length > 0) {
+        return { valid: false, message: `盒号重复选择：${duplicates.join('，')}` }
+      }
     }
     return { valid: true }
   }

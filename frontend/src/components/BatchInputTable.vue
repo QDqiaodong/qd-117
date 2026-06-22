@@ -60,6 +60,7 @@
                   :key="opt.value"
                   :label="opt.label"
                   :value="opt.value"
+                  :disabled="opt.disabled || false"
                 />
               </el-select>
             </template>
@@ -246,17 +247,28 @@ const markRowTouched = (index) => {
 
 const handleCellChange = (index, prop) => {
   markRowTouched(index)
-  validateCell(index, prop)
-  if (prop === 'partType' || prop === 'partId') {
-    validateRow(index)
-  }
+  validateRow(index)
+  validateAllCrossField(index)
   emitChange()
 }
 
 const handleInputNumberChange = (index, prop) => {
   markRowTouched(index)
-  validateCell(index, prop)
+  validateRow(index)
+  validateAllCrossField(index)
   emitChange()
+}
+
+const validateAllCrossField = (changedIndex) => {
+  tableData.value.forEach((_, i) => {
+    if (i === changedIndex) return
+    props.columns.forEach(col => {
+      const validator = props.validators[col.prop]
+      if (validator && validator.length >= 4) {
+        validateCell(i, col.prop)
+      }
+    })
+  })
 }
 
 const emitChange = () => {
