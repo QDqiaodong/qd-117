@@ -9,6 +9,7 @@ import com.inventory.mapper.StockThresholdConfigMapper;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
+@DependsOn("databaseSchemaInitializer")
 @RequiredArgsConstructor
 public class StockThresholdConfigService extends ServiceImpl<StockThresholdConfigMapper, StockThresholdConfig> {
 
