@@ -153,6 +153,26 @@ INSERT INTO scrap_reason (reason_code, reason_name, part_type, sort, status) VAL
 ('SHIM_OTHER', '垫片其他', '限位垫片', 8, 1),
 ('COMMON_OTHER', '其他', '全部', 99, 1);
 
+CREATE TABLE IF NOT EXISTS line_return_record (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    part_id BIGINT NOT NULL COMMENT '小件ID',
+    part_model VARCHAR(100) NOT NULL COMMENT '零件型号',
+    quantity INT NOT NULL COMMENT '退回总数量',
+    qualified_quantity INT NOT NULL DEFAULT 0 COMMENT '合格数量（回补库存）',
+    unqualified_quantity INT NOT NULL DEFAULT 0 COMMENT '不合格数量（引导报废）',
+    reusable_status VARCHAR(50) NOT NULL COMMENT '可复用状态：全部合格/部分合格/全部不合格',
+    production_line VARCHAR(100) NOT NULL COMMENT '退回产线',
+    original_receiver VARCHAR(50) COMMENT '原领用人',
+    operator VARCHAR(50) NOT NULL COMMENT '操作人',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_part_id (part_id),
+    INDEX idx_create_time (create_time),
+    INDEX idx_production_line (production_line),
+    INDEX idx_reusable_status (reusable_status),
+    INDEX idx_part_model_create_time (part_model, create_time DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产线退回记录表';
+
 CREATE TABLE IF NOT EXISTS pin_box (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     box_no VARCHAR(100) NOT NULL COMMENT '盒号',

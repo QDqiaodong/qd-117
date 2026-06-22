@@ -39,6 +39,15 @@
           </span>
         </template>
       </el-tab-pane>
+      <el-tab-pane name="return">
+        <template #label>
+          <span class="tab-label">
+            <span class="tab-ribbon ribbon-return"></span>
+            <span class="tab-icon icon-return">↩</span>
+            退回记录
+          </span>
+        </template>
+      </el-tab-pane>
     </el-tabs>
 
     <div class="toolbar">
@@ -89,6 +98,29 @@
           <el-option label="断裂" value="断裂" />
           <el-option label="磨损" value="磨损" />
           <el-option label="其他" value="其他" />
+        </el-select>
+        <el-select
+          v-if="activeTab === 'return'"
+          v-model="searchForm.productionLine"
+          placeholder="退回产线"
+          clearable
+          style="width: 160px;"
+        >
+          <el-option label="一号装配线" value="一号装配线" />
+          <el-option label="二号装配线" value="二号装配线" />
+          <el-option label="三号装配线" value="三号装配线" />
+          <el-option label="四号装配线" value="四号装配线" />
+        </el-select>
+        <el-select
+          v-if="activeTab === 'return'"
+          v-model="searchForm.reusableStatus"
+          placeholder="可复用状态"
+          clearable
+          style="width: 140px;"
+        >
+          <el-option label="全部合格" value="全部合格" />
+          <el-option label="部分合格" value="部分合格" />
+          <el-option label="全部不合格" value="全部不合格" />
         </el-select>
         <el-date-picker
           v-model="searchForm.dateRange"
@@ -213,6 +245,33 @@
       </el-table>
     </template>
 
+    <template v-if="activeTab === 'return'">
+      <el-table :data="tableData" stripe border v-loading="loading" style="width: 100%;">
+        <el-table-column prop="partModel" label="零件型号" min-width="140" />
+        <el-table-column prop="quantity" label="退回总数" width="90" align="center" />
+        <el-table-column label="合格/不合格" width="140" align="center">
+          <template #default="{ row }">
+            <el-tag type="success" size="small">合格:{{ row.qualifiedQuantity }}</el-tag>
+            <el-tag type="danger" size="small" style="margin-left: 4px;">不合格:{{ row.unqualifiedQuantity }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reusableStatus" label="可复用状态" width="110" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.reusableStatus === '全部合格' ? 'success' : (row.reusableStatus === '部分合格' ? 'warning' : 'danger')">
+              {{ row.reusableStatus }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="productionLine" label="退回产线" width="110" align="center" />
+        <el-table-column prop="originalReceiver" label="原领用人" width="100" align="center">
+          <template #default="{ row }">{{ row.originalReceiver || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="operator" label="操作人" width="100" align="center" />
+        <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="createTime" label="退回时间" width="170" align="center" />
+      </el-table>
+    </template>
+
     <div style="margin-top: 20px; text-align: right;">
       <el-pagination
         v-model:current-page="pageNum"
@@ -273,7 +332,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getStockInPage, getStockOutPage, getStockCheckPage, getScrapPage, confirmStockCheckDiff } from '@/api'
+import { getStockInPage, getStockOutPage, getStockCheckPage, getScrapPage, confirmStockCheckDiff, getLineReturnPage } from '@/api'
 
 const activeTab = ref('in')
 const loading = ref(false)
@@ -295,6 +354,7 @@ const searchForm = reactive({
   quarter: '',
   confirmStatus: null,
   scrapReason: '',
+  reusableStatus: '',
   dateRange: []
 })
 
@@ -309,6 +369,7 @@ const resetSearch = () => {
   searchForm.quarter = ''
   searchForm.confirmStatus = null
   searchForm.scrapReason = ''
+  searchForm.reusableStatus = ''
   searchForm.dateRange = []
   pageNum.value = 1
   loadData()
@@ -342,6 +403,13 @@ const loadData = async () => {
         break
       case 'scrap':
         res = await getScrapPage({ ...baseParams, scrapReason: searchForm.scrapReason || undefined })
+        break
+      case 'return':
+        res = await getLineReturnPage({
+          ...baseParams,
+          productionLine: searchForm.productionLine || undefined,
+          reusableStatus: searchForm.reusableStatus || undefined
+        })
         break
     }
 
@@ -420,6 +488,10 @@ onMounted(loadData)
   &.ribbon-scrap {
     background: #e6a23c;
   }
+
+  &.ribbon-return {
+    background: #909399;
+  }
 }
 
 .tab-icon {
@@ -441,6 +513,10 @@ onMounted(loadData)
 
   &.icon-scrap {
     color: #e6a23c;
+  }
+
+  &.icon-return {
+    color: #909399;
   }
 }
 

@@ -40,6 +40,10 @@
             <el-icon><MinusBox /></el-icon>
             <span>产线领用出库</span>
           </el-menu-item>
+          <el-menu-item index="/line-return">
+            <el-icon><RefreshRight /></el-icon>
+            <span>产线退回登记</span>
+          </el-menu-item>
           <el-menu-item index="/line-quota">
             <el-icon><GoldMedal /></el-icon>
             <span>产线领用配额</span>

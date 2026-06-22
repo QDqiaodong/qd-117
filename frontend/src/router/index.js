@@ -32,6 +32,12 @@ const routes = [
     meta: { title: '产线领用出库' }
   },
   {
+    path: '/line-return',
+    name: 'LineReturn',
+    component: () => import('@/views/LineReturn.vue'),
+    meta: { title: '产线退回登记' }
+  },
+  {
     path: '/line-quota',
     name: 'LineQuota',
     component: () => import('@/views/LineQuota.vue'),

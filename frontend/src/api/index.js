@@ -326,3 +326,19 @@ export const getPinBoxesByStockOut = (recordId) => {
     method: 'get'
   })
 }
+
+export const getLineReturnPage = (params) => {
+  return request({
+    url: '/line-return/page',
+    method: 'get',
+    params
+  })
+}
+
+export const lineReturn = (data) => {
+  return request({
+    url: '/line-return',
+    method: 'post',
+    data
+  })
+}

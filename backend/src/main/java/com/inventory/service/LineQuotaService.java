@@ -122,6 +122,18 @@ public class LineQuotaService extends ServiceImpl<LineQuotaMapper, LineQuota> {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public void returnQuota(String productionLine, String partType, int quantity) {
+        String quarter = currentQuarter();
+        LineQuota quota = getByQuarterLineType(quarter, productionLine, partType);
+        if (quota == null) {
+            log.warn("未配置 {} {} {} 季度领用配额，跳过配额退回", quarter, productionLine, partType);
+            return;
+        }
+        lineQuotaMapper.rollbackQuotaAtomic(quota.getId(), quantity);
+        log.info("退回配额 {} {} {} -{}", quarter, productionLine, partType, quantity);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public void consumeQuota(String productionLine, String partType, int quantity) {
         String quarter = currentQuarter();
         LineQuota quota = getByQuarterLineType(quarter, productionLine, partType);
