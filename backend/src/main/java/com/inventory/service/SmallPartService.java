@@ -92,14 +92,7 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         return part;
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public SmallPart update(SmallPart part) {
-        return update(part, false, null);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    public SmallPart update(SmallPart part, boolean partTypeChanged, String oldPartType) {
-        SmallPart oldPart = getById(part.getId());
+    private void trimPartFields(SmallPart part) {
         if (part.getPartModel() != null) {
             part.setPartModel(part.getPartModel().trim());
         }
@@ -118,6 +111,17 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         if (part.getSpecParams() != null) {
             part.setSpecParams(part.getSpecParams().trim());
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SmallPart update(SmallPart part) {
+        return update(part, false, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SmallPart update(SmallPart part, boolean partTypeChanged, String oldPartType) {
+        SmallPart oldPart = getById(part.getId());
+        trimPartFields(part);
         part.setUpdateTime(LocalDateTime.now());
         updateById(part);
         SmallPart updated = getById(part.getId());
@@ -140,6 +144,27 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         removeById(id);
         partSpecCache.removePartSpec(part);
         log.info("删除小件: {}", part.getPartModel());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SmallPart updateAndIncreaseStock(SmallPart part, boolean partTypeChanged, String oldPartType, int quantity) {
+        SmallPart originalPart = getById(part.getId());
+        trimPartFields(part);
+        part.setUpdateTime(LocalDateTime.now());
+        updateById(part);
+        int rows = smallPartMapper.increaseStockAtomic(part.getId(), quantity);
+        if (rows != 1) {
+            throw new BusinessException("库存增加失败: " + originalPart.getPartModel());
+        }
+        SmallPart finalPart = getById(part.getId());
+        if (partTypeChanged && oldPartType != null) {
+            partSpecCache.removePartSpecByType(originalPart, oldPartType);
+            partSpecCache.addPartSpec(finalPart);
+        } else {
+            partSpecCache.updatePartSpec(originalPart, finalPart);
+        }
+        log.info("更新并增加库存: {}, +{}", finalPart.getPartModel(), quantity);
+        return finalPart;
     }
 
     @Transactional(rollbackFor = Exception.class)

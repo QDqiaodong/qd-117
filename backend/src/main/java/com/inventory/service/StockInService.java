@@ -106,8 +106,7 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
                     part.setRemark(item.getRemark());
                 }
                 boolean partTypeChangedForUpdate = !oldPartTypeForUpdate.equals(part.getPartType());
-                smallPartService.update(part, partTypeChangedForUpdate, oldPartTypeForUpdate);
-                smallPartService.increaseStock(part.getId(), item.getQuantity());
+                smallPartService.updateAndIncreaseStock(part, partTypeChangedForUpdate, oldPartTypeForUpdate, item.getQuantity());
             }
 
             String newPartType = item.getPartType();
