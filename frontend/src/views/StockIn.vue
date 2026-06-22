@@ -125,6 +125,44 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="capacityDialogVisible"
+      title="货架容量校验失败"
+      width="600px"
+      :close-on-click-modal="true"
+      top="8vh"
+    >
+      <el-alert type="error" show-icon :closable="false" style="margin-bottom: 16px;">
+        货架容量不足，请调整入库数据或更换货架后再提交。
+      </el-alert>
+      <div class="validation-errors" style="margin-bottom: 16px;">
+        <div v-for="(err, idx) in capacityErrors" :key="idx" class="error-row-group">
+          <div class="error-row-header" style="cursor: default;">
+            <el-icon color="#f56c6c"><Warning /></el-icon>
+            <span class="row-label">{{ err }}</span>
+          </div>
+        </div>
+      </div>
+      <template v-if="capacitySuggestions.length > 0">
+        <el-divider content-position="left">可用货架建议</el-divider>
+        <el-table :data="capacitySuggestions" size="small" border>
+          <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
+          <el-table-column prop="partType" label="零件类型" width="100" align="center" />
+          <el-table-column label="剩余/总容量" width="120" align="center">
+            <template #default="{ row }">
+              {{ row.remainingCapacity }} / {{ row.maxCapacity }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+        </el-table>
+      </template>
+      <template #footer>
+        <el-button type="primary" @click="capacityDialogVisible = false">
+          我知道了，去修改
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -133,7 +171,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Aim, Warning } from '@element-plus/icons-vue'
 import BatchInputTable from '@/components/BatchInputTable.vue'
-import { stockIn, getStockInPage } from '@/api'
+import { stockIn, validateStockIn, getStockInPage } from '@/api'
 
 const submitting = ref(false)
 const loading = ref(false)
@@ -141,6 +179,9 @@ const recordData = ref([])
 const recordTotal = ref(0)
 const errorDialogVisible = ref(false)
 const validationErrors = ref([])
+const capacityDialogVisible = ref(false)
+const capacityErrors = ref([])
+const capacitySuggestions = ref([])
 
 const fieldLabelMap = {
   partModel: '零件型号',
@@ -299,6 +340,14 @@ const validators = {
     if (!trimmed) {
       return { valid: false, message: '顶针类型请填写盒号起始' }
     }
+    if (row && row.quantity) {
+      const start = trimmed
+      const end = (row.boxNoEnd && row.boxNoEnd.trim()) || start
+      const boxes = parseBoxRange(start, end)
+      if (boxes.length > 0 && boxes.length !== row.quantity) {
+        return { valid: false, message: `盒号范围生成${boxes.length}个盒号，与入库数量${row.quantity}不一致` }
+      }
+    }
     if (allRows && row && row.partType === '顶针') {
       const start = trimmed
       const end = (row.boxNoEnd && row.boxNoEnd.trim()) || start
@@ -322,6 +371,23 @@ const validators = {
           conflicts.push(`${bn}(第${rows.join('、')}行)`)
         })
         return { valid: false, message: `盒号范围与其他行重复：${conflicts.join('，')}` }
+      }
+    }
+    return { valid: true }
+  },
+  boxNoEnd: (value, row) => {
+    if (row && row.partType !== '顶针') {
+      return { valid: true }
+    }
+    const start = (row && row.boxNoStart && row.boxNoStart.trim()) || ''
+    const end = value ? value.trim() : ''
+    if (!start) {
+      return { valid: true }
+    }
+    if (end && row && row.quantity) {
+      const boxes = parseBoxRange(start, end)
+      if (boxes.length > 0 && boxes.length !== row.quantity) {
+        return { valid: false, message: `盒号范围生成${boxes.length}个盒号，与入库数量${row.quantity}不一致` }
       }
     }
     return { valid: true }
@@ -361,6 +427,20 @@ const submit = async () => {
     ElMessage.warning('请至少填写一行有效的入库数据')
     return
   }
+
+  try {
+    const payload = { operator: form.operator.trim(), items: validItems }
+    const validateRes = await validateStockIn(payload)
+    if (validateRes.data && !validateRes.data.valid) {
+      capacityErrors.value = validateRes.data.errors || []
+      capacitySuggestions.value = validateRes.data.suggestions || []
+      capacityDialogVisible.value = true
+      return
+    }
+  } catch (e) {
+    console.error(e)
+  }
+
   try {
     await ElMessageBox.confirm(`确认入库 ${validItems.length} 条记录？`, '确认')
     submitting.value = true

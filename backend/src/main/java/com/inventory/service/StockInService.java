@@ -54,6 +54,7 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             trimItem(item);
         }
 
+        checkStockInBoxNoQuantityConsistency(dto.getItems());
         checkStockInBoxNoConflicts(dto.getItems());
         checkStockInConflicts(dto.getItems());
 
@@ -288,6 +289,27 @@ public class StockInService extends ServiceImpl<StockInRecordMapper, StockInReco
             result.add(prefix + String.format("%0" + numWidth + "d", i));
         }
         return result;
+    }
+
+    private void checkStockInBoxNoQuantityConsistency(List<StockInDTO.StockInItem> items) {
+        for (int i = 0; i < items.size(); i++) {
+            StockInDTO.StockInItem item = items.get(i);
+            int rowNum = i + 1;
+            if (!"顶针".equals(item.getPartType())) {
+                continue;
+            }
+            if (item.getBoxNoStart() == null || item.getBoxNoStart().trim().isEmpty()) {
+                continue;
+            }
+            String start = item.getBoxNoStart().trim();
+            String end = (item.getBoxNoEnd() != null && !item.getBoxNoEnd().trim().isEmpty())
+                    ? item.getBoxNoEnd().trim() : start;
+            List<String> boxNos = parseBoxRange(start, end);
+            if (!boxNos.isEmpty() && boxNos.size() != item.getQuantity()) {
+                throw new BusinessException("第" + rowNum + "行盒号范围生成" + boxNos.size()
+                        + "个盒号，与入库数量" + item.getQuantity() + "不一致");
+            }
+        }
     }
 
     private void checkStockInBoxNoConflicts(List<StockInDTO.StockInItem> items) {

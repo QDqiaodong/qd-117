@@ -304,6 +304,12 @@ const validators = {
     if (row.quantity && total > row.quantity) {
       return { valid: false, message: '合格与不合格之和不能超过退回总数' }
     }
+    if (row.reusableStatus === '全部不合格' && value > 0) {
+      return { valid: false, message: '选择"全部不合格"时，合格数量必须为0' }
+    }
+    if (row.reusableStatus === '部分合格' && value <= 0 && (row.unqualifiedQuantity || 0) > 0) {
+      return { valid: false, message: '选择"部分合格"时，合格数量应大于0' }
+    }
     return { valid: true }
   },
   unqualifiedQuantity: (value, row) => {
@@ -316,11 +322,30 @@ const validators = {
     if (q + uq !== qty) {
       return { valid: false, message: `合格+不合格(${q + uq})必须等于退回总数(${qty})` }
     }
+    if (row.reusableStatus === '全部合格' && value > 0) {
+      return { valid: false, message: '选择"全部合格"时，不合格数量必须为0' }
+    }
+    if (row.reusableStatus === '部分合格' && value <= 0 && (row.qualifiedQuantity || 0) > 0) {
+      return { valid: false, message: '选择"部分合格"时，不合格数量应大于0' }
+    }
     return { valid: true }
   },
-  reusableStatus: (value) => {
+  reusableStatus: (value, row) => {
     if (!value) {
       return { valid: false, message: '请选择可复用状态' }
+    }
+    if (row) {
+      const q = row.qualifiedQuantity || 0
+      const uq = row.unqualifiedQuantity || 0
+      if (value === '全部合格' && uq > 0) {
+        return { valid: false, message: '选择"全部合格"时，不合格数量必须为0' }
+      }
+      if (value === '全部不合格' && q > 0) {
+        return { valid: false, message: '选择"全部不合格"时，合格数量必须为0' }
+      }
+      if (value === '部分合格' && (q <= 0 || uq <= 0)) {
+        return { valid: false, message: '选择"部分合格"时，合格和不合格数量都应大于0' }
+      }
     }
     return { valid: true }
   }

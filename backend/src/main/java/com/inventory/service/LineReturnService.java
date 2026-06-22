@@ -67,6 +67,16 @@ public class LineReturnService extends ServiceImpl<LineReturnRecordMapper, LineR
             }
             if (item.getReusableStatus() != null) {
                 item.setReusableStatus(item.getReusableStatus().trim());
+                String status = item.getReusableStatus();
+                if ("全部合格".equals(status) && item.getUnqualifiedQuantity() > 0) {
+                    throw new BusinessException("可复用状态为「全部合格」时，不合格数量必须为0，零件ID：" + item.getPartId());
+                }
+                if ("全部不合格".equals(status) && item.getQualifiedQuantity() > 0) {
+                    throw new BusinessException("可复用状态为「全部不合格」时，合格数量必须为0，零件ID：" + item.getPartId());
+                }
+                if ("部分合格".equals(status) && (item.getQualifiedQuantity() <= 0 || item.getUnqualifiedQuantity() <= 0)) {
+                    throw new BusinessException("可复用状态为「部分合格」时，合格和不合格数量都应大于0，零件ID：" + item.getPartId());
+                }
             }
         }
 

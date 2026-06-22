@@ -90,6 +90,14 @@ export const stockIn = (data) => {
   })
 }
 
+export const validateStockIn = (data) => {
+  return request({
+    url: '/stock-in/validate',
+    method: 'post',
+    data
+  })
+}
+
 export const getStockOutPage = (params) => {
   return request({
     url: '/stock-out/page',

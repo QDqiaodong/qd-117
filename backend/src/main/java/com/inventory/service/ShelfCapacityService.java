@@ -19,7 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -169,35 +171,59 @@ public class ShelfCapacityService extends ServiceImpl<ShelfCapacityMapper, Shelf
     public StockInValidationVO validateStockIn(StockInDTO dto) {
         StockInValidationVO result = StockInValidationVO.success();
 
+        Map<String, Integer> pinBoxesByShelf = new HashMap<>();
+        Map<String, Integer> shimPacksByShelf = new HashMap<>();
+        Map<String, List<String>> shelfItemLabels = new HashMap<>();
+
         for (StockInDTO.StockInItem item : dto.getItems()) {
-            String partType = item.getPartType();
             String shelfNo = item.getShelfNo();
             int quantity = item.getQuantity() != null ? item.getQuantity() : 0;
+            String label = item.getPartModel() + "(" + quantity + ")";
 
+            if ("顶针".equals(item.getPartType())) {
+                SmallPart existing = smallPartService.getByModel(item.getPartModel());
+                int additionalQty = (existing != null && existing.getShelfNo() != null
+                        && existing.getShelfNo().equals(shelfNo)) ? quantity : quantity;
+                pinBoxesByShelf.merge(shelfNo, additionalQty, Integer::sum);
+                shelfItemLabels.computeIfAbsent(shelfNo + "_顶针", k -> new ArrayList<>()).add(label);
+            } else if ("限位垫片".equals(item.getPartType())) {
+                SmallPart existing = smallPartService.getByModel(item.getPartModel());
+                int additionalQty = (existing != null && existing.getShelfNo() != null
+                        && existing.getShelfNo().equals(shelfNo)) ? quantity : quantity;
+                shimPacksByShelf.merge(shelfNo, additionalQty, Integer::sum);
+                shelfItemLabels.computeIfAbsent(shelfNo + "_限位垫片", k -> new ArrayList<>()).add(label);
+            }
+        }
+
+        for (Map.Entry<String, Integer> entry : pinBoxesByShelf.entrySet()) {
+            String shelfNo = entry.getKey();
+            int totalAdditional = entry.getValue();
             ShelfCapacity capacity = getByShelfNo(shelfNo);
             if (capacity == null) {
                 log.warn("货架 {} 未配置容量限制，跳过容量校验", shelfNo);
                 continue;
             }
+            if (!capacity.canAddPinBoxes(totalAdditional)) {
+                String itemDetail = String.join(" + ", shelfItemLabels.getOrDefault(shelfNo + "_顶针", new ArrayList<>()));
+                result.addError("货架 [" + shelfNo + "] 顶针容量不足，本批合计需要 " + totalAdditional
+                        + " 盒（" + itemDetail + "），剩余容量仅 " + capacity.getRemainingPinBoxes() + " 盒");
+                result.getSuggestions().addAll(findAvailableShelvesForPin(totalAdditional));
+            }
+        }
 
-            if ("顶针".equals(partType)) {
-                SmallPart existing = smallPartService.getByModel(item.getPartModel());
-                int additionalQty = (existing != null && existing.getShelfNo() != null
-                        && existing.getShelfNo().equals(shelfNo)) ? quantity : quantity;
-                if (!capacity.canAddPinBoxes(additionalQty)) {
-                    result.addError("货架 [" + shelfNo + "] 顶针容量不足，需要 " + additionalQty
-                            + " 盒，剩余容量仅 " + capacity.getRemainingPinBoxes() + " 盒");
-                    result.getSuggestions().addAll(findAvailableShelvesForPin(additionalQty));
-                }
-            } else if ("限位垫片".equals(partType)) {
-                SmallPart existing = smallPartService.getByModel(item.getPartModel());
-                int additionalQty = (existing != null && existing.getShelfNo() != null
-                        && existing.getShelfNo().equals(shelfNo)) ? quantity : quantity;
-                if (!capacity.canAddShimPacks(additionalQty)) {
-                    result.addError("货架 [" + shelfNo + "] 垫片容量不足，需要 " + additionalQty
-                            + " 包，剩余容量仅 " + capacity.getRemainingShimPacks() + " 包");
-                    result.getSuggestions().addAll(findAvailableShelvesForShim(additionalQty));
-                }
+        for (Map.Entry<String, Integer> entry : shimPacksByShelf.entrySet()) {
+            String shelfNo = entry.getKey();
+            int totalAdditional = entry.getValue();
+            ShelfCapacity capacity = getByShelfNo(shelfNo);
+            if (capacity == null) {
+                log.warn("货架 {} 未配置容量限制，跳过容量校验", shelfNo);
+                continue;
+            }
+            if (!capacity.canAddShimPacks(totalAdditional)) {
+                String itemDetail = String.join(" + ", shelfItemLabels.getOrDefault(shelfNo + "_限位垫片", new ArrayList<>()));
+                result.addError("货架 [" + shelfNo + "] 垫片容量不足，本批合计需要 " + totalAdditional
+                        + " 包（" + itemDetail + "），剩余容量仅 " + capacity.getRemainingShimPacks() + " 包");
+                result.getSuggestions().addAll(findAvailableShelvesForShim(totalAdditional));
             }
         }
 
