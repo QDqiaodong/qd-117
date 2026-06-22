@@ -247,6 +247,10 @@ const markRowTouched = (index) => {
 
 const handleCellChange = (index, prop) => {
   markRowTouched(index)
+  const col = props.columns.find(c => c.prop === prop)
+  if (col && col.onChange) {
+    col.onChange(tableData.value[index], index, tableData.value)
+  }
   validateRow(index)
   validateAllCrossField(index)
   emitChange()

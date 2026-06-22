@@ -74,7 +74,7 @@
           value-format="YYYY-MM-DD"
           style="width: 300px;"
         />
-        <el-button type="primary" @click="loadRecords">
+        <el-button type="primary" @click="searchRecords">
           <el-icon><Search /></el-icon> 查询
         </el-button>
       </div>
@@ -254,7 +254,13 @@ const columns = reactive([
     label: '选择零件',
     type: 'select',
     minWidth: 200,
-    options: []
+    options: [],
+    onChange: (row, rowIndex, allRows) => {
+      row.boxNos = []
+      if (row.partId) {
+        loadAvailableBoxes(row.partId)
+      }
+    }
   },
   { prop: 'quantity', label: '领用数量', type: 'number', min: 0, width: 120 },
   {
@@ -449,6 +455,11 @@ const resetForm = () => {
   form.remark = ''
   form.items = []
   Object.keys(availableBoxesMap).forEach(k => delete availableBoxesMap[k])
+}
+
+const searchRecords = () => {
+  recordPage.pageNum = 1
+  loadRecords()
 }
 
 const loadRecords = async () => {

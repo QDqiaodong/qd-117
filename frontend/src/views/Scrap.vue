@@ -54,7 +54,7 @@
           value-format="YYYY-MM-DD"
           style="width: 300px;"
         />
-        <el-button type="primary" @click="loadRecords">
+        <el-button type="primary" @click="searchRecords">
           <el-icon><Search /></el-icon> 查询
         </el-button>
       </div>
@@ -319,6 +319,11 @@ const resetForm = () => {
   form.operator = ''
   form.remark = ''
   form.items = []
+}
+
+const searchRecords = () => {
+  recordPage.pageNum = 1
+  loadRecords()
 }
 
 const loadRecords = async () => {
