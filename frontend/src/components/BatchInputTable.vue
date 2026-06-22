@@ -327,10 +327,35 @@ const errorRows = computed(() => {
 })
 
 const displayData = computed(() => {
-  const rows = tableData.value.map((row, index) => ({
-    ...row,
-    _originalIndex: index
-  }))
+  const rows = tableData.value.map((row, index) => {
+    return new Proxy(row, {
+      get(target, prop) {
+        if (prop === '_originalIndex') {
+          return index
+        }
+        return target[prop]
+      },
+      set(target, prop, value) {
+        if (prop === '_originalIndex') {
+          return true
+        }
+        target[prop] = value
+        return true
+      },
+      has(target, prop) {
+        return prop === '_originalIndex' || prop in target
+      },
+      ownKeys(target) {
+        return [...Reflect.ownKeys(target), '_originalIndex']
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        if (prop === '_originalIndex') {
+          return { enumerable: true, configurable: true, value: index }
+        }
+        return Reflect.getOwnPropertyDescriptor(target, prop)
+      }
+    })
+  })
   if (!props.rowFilterFn) {
     return rows
   }
