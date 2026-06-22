@@ -350,3 +350,33 @@ export const lineReturn = (data) => {
     data
   })
 }
+
+export const getStockThresholdList = () => {
+  return request({
+    url: '/stock-threshold/list',
+    method: 'get'
+  })
+}
+
+export const getStockThresholdByPartType = (partType) => {
+  return request({
+    url: '/stock-threshold/by-part-type',
+    method: 'get',
+    params: { partType }
+  })
+}
+
+export const updateStockThreshold = (data) => {
+  return request({
+    url: '/stock-threshold',
+    method: 'put',
+    data
+  })
+}
+
+export const refreshStockThresholdCache = () => {
+  return request({
+    url: '/stock-threshold/refresh-cache',
+    method: 'post'
+  })
+}

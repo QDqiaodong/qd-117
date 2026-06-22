@@ -35,5 +35,7 @@ public class PinMatrixVO {
         private String shelfNo;
 
         private String partModel;
+
+        private String warningLevel;
     }
 }

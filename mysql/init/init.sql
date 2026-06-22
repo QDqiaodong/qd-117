@@ -194,3 +194,18 @@ CREATE TABLE IF NOT EXISTS pin_box (
     INDEX idx_stock_out_record_id (stock_out_record_id),
     INDEX idx_create_time (create_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顶针盒号表';
+
+CREATE TABLE IF NOT EXISTS stock_threshold_config (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    part_type VARCHAR(50) NOT NULL COMMENT '零件类型：顶针/限位垫片',
+    danger_threshold INT NOT NULL DEFAULT 10 COMMENT '危险阈值（低于等于该值为危险）',
+    warning_threshold INT NOT NULL DEFAULT 50 COMMENT '警告阈值（低于等于该值为警告）',
+    remark VARCHAR(500) COMMENT '备注',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_part_type (part_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存阈值配置表';
+
+INSERT INTO stock_threshold_config (part_type, danger_threshold, warning_threshold, remark) VALUES
+('顶针', 10, 50, '顶针低存量预警阈值'),
+('限位垫片', 10, 50, '限位垫片低存量预警阈值');

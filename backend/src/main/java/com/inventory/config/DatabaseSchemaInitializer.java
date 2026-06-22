@@ -29,6 +29,7 @@ public class DatabaseSchemaInitializer {
         ensureScrapReasonTable();
         ensurePinBoxTable();
         ensureLineReturnRecordTable();
+        ensureStockThresholdConfigTable();
     }
 
     private void ensureSmallPartTable() {
@@ -313,6 +314,56 @@ public class DatabaseSchemaInitializer {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产线退回记录表'
                 """;
         executeDdl("line_return_record", ddl);
+    }
+
+    private void ensureStockThresholdConfigTable() {
+        String ddl = """
+                CREATE TABLE IF NOT EXISTS stock_threshold_config (
+                    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                    part_type VARCHAR(50) NOT NULL COMMENT '零件类型：顶针/限位垫片',
+                    danger_threshold INT NOT NULL DEFAULT 10 COMMENT '危险阈值（低于等于该值为危险）',
+                    warning_threshold INT NOT NULL DEFAULT 50 COMMENT '警告阈值（低于等于该值为警告）',
+                    remark VARCHAR(500) COMMENT '备注',
+                    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    UNIQUE KEY uk_part_type (part_type)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='库存阈值配置表'
+                """;
+        executeDdl("stock_threshold_config", ddl);
+        initDefaultStockThresholds();
+    }
+
+    private void initDefaultStockThresholds() {
+        String checkSql = "SELECT COUNT(*) FROM stock_threshold_config";
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement();
+             var rs = statement.executeQuery(checkSql)) {
+            if (rs.next() && rs.getInt(1) > 0) {
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("检查库存阈值配置数据失败", e);
+            return;
+        }
+
+        String[][] defaults = {
+                {"顶针", "10", "50", "顶针低存量预警阈值"},
+                {"限位垫片", "10", "50", "限位垫片低存量预警阈值"}
+        };
+
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            for (String[] row : defaults) {
+                String insert = String.format(
+                        "INSERT INTO stock_threshold_config (part_type, danger_threshold, warning_threshold, remark, create_time, update_time) " +
+                                "VALUES ('%s', %s, %s, '%s', NOW(), NOW())",
+                        row[0], row[1], row[2], row[3]);
+                statement.execute(insert);
+            }
+            log.info("初始化库存阈值配置默认数据完成");
+        } catch (Exception e) {
+            log.warn("初始化库存阈值配置默认数据失败", e);
+        }
     }
 
     private void ensureColumnExists(String tableName, String columnName, String columnDef) {

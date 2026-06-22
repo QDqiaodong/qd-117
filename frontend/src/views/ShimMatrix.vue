@@ -35,9 +35,10 @@
           clearable
           style="width: 190px;"
         >
-          <el-option label="无库存 (0)" value="zero" />
-          <el-option label="低存量 (≤10)" value="low" />
-          <el-option label="有库存 (>0)" value="has" />
+          <el-option label="无库存" value="zero" />
+          <el-option label="紧缺" value="danger" />
+          <el-option label="偏低" value="warning" />
+          <el-option label="有库存" value="has" />
         </el-select>
         <el-tooltip content="规格来自入库时的规格参数(厚度/外径)；低存量与无库存规格高亮，便于装配前提前备料" placement="top">
           <el-icon class="hint-icon"><InfoFilled /></el-icon>
@@ -60,7 +61,7 @@
         <div class="alert-strip" v-if="warningCount > 0">
           <el-icon><WarningFilled /></el-icon>
           <span>
-            检出 <b>{{ zeroCount }}</b> 个无库存规格、<b>{{ lowCount }}</b> 个低存量规格(≤10)，建议装配前优先补料，避免临时翻货架。
+            检出 <b>{{ zeroCount }}</b> 个无库存规格、<b>{{ lowCount }}</b> 个低存量规格，建议装配前优先补料，避免临时翻货架。
           </span>
         </div>
 
@@ -104,9 +105,9 @@
     </div>
 
     <div class="legend">
-      <span class="lg ok">充足 (&gt;50)</span>
-      <span class="lg warn">偏少 (11-50)</span>
-      <span class="lg danger">低存量 (≤10)</span>
+      <span class="lg ok">充足</span>
+      <span class="lg warn">偏低</span>
+      <span class="lg danger">紧缺</span>
       <span class="lg zero">无库存</span>
       <span v-if="matrix.skipped > 0" class="lg skip">
         {{ matrix.skipped }} 个型号未填写完整规格(厚度/外径)，已隐藏
@@ -163,7 +164,8 @@ const passFilter = (c) => {
     if (!hit) return false
   }
   if (stockFilter.value === 'zero' && !(c.quantity <= 0)) return false
-  if (stockFilter.value === 'low' && !(c.quantity > 0 && c.quantity <= 10)) return false
+  if (stockFilter.value === 'danger' && c.warningLevel !== 'danger') return false
+  if (stockFilter.value === 'warning' && c.warningLevel !== 'warning') return false
   if (stockFilter.value === 'has' && !(c.quantity > 0)) return false
   return true
 }
@@ -186,7 +188,7 @@ const filteredOuterDiameters = computed(() => {
 
 const zeroCount = computed(() => matrix.cells.filter((c) => c.quantity <= 0).length)
 const lowCount = computed(
-  () => matrix.cells.filter((c) => c.quantity > 0 && c.quantity <= 10).length
+  () => matrix.cells.filter((c) => c.warningLevel === 'danger' || c.warningLevel === 'warning').length
 )
 const warningCount = computed(() => zeroCount.value + lowCount.value)
 
@@ -197,8 +199,8 @@ const getCell = (t, od) => {
 const cellClass = (c) => {
   if (!c) return 'c-empty'
   if (c.quantity <= 0) return 'c-zero'
-  if (c.quantity <= 10) return 'c-danger'
-  if (c.quantity <= 50) return 'c-warn'
+  if (c.warningLevel === 'danger') return 'c-danger'
+  if (c.warningLevel === 'warning') return 'c-warn'
   return 'c-ok'
 }
 

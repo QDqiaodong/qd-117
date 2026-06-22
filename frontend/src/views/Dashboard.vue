@@ -113,7 +113,7 @@
       <el-table-column prop="shelfNo" label="货架编号" width="120" align="center" />
       <el-table-column prop="stockQuantity" label="库存数量" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.stockQuantity <= 10 ? 'danger' : (row.stockQuantity <= 50 ? 'warning' : 'success')">
+          <el-tag :type="getWarningTagType(row.warningLevel)">
             {{ row.stockQuantity }}
           </el-tag>
         </template>
@@ -267,6 +267,12 @@ const formatTooltipJson = (text) => {
     return JSON.stringify(json, null, 2)
   }
   return text
+}
+
+const getWarningTagType = (level) => {
+  if (level === 'danger') return 'danger'
+  if (level === 'warning') return 'warning'
+  return 'success'
 }
 
 onMounted(loadData)

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.inventory.cache.PartSpecCache;
+import com.inventory.common.WarningLevel;
 import com.inventory.dto.PartSpecCacheDiagnosisVO;
 import com.inventory.dto.PinMatrixVO;
 import com.inventory.dto.ShimMatrixVO;
@@ -38,10 +39,15 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
     private final SmallPartMapper smallPartMapper;
     private final PartSpecCache partSpecCache;
     private final SpecParser specParser;
+    private final StockThresholdConfigService stockThresholdConfigService;
 
     public IPage<SmallPart> getPageList(Integer pageNum, Integer pageSize, String partType, String keyword) {
         Page<SmallPart> page = new Page<>(pageNum, pageSize);
-        return smallPartMapper.selectPageList(page, partType, keyword);
+        IPage<SmallPart> result = smallPartMapper.selectPageList(page, partType, keyword);
+        for (SmallPart part : result.getRecords()) {
+            setWarningLevel(part);
+        }
+        return result;
     }
 
     public SmallPart getById(Long id) {
@@ -49,6 +55,7 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
         if (part == null) {
             throw new BusinessException("小件不存在");
         }
+        setWarningLevel(part);
         return part;
     }
 
@@ -193,7 +200,17 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
     }
 
     public List<SmallPart> listAll() {
-        return list();
+        List<SmallPart> list = list();
+        for (SmallPart part : list) {
+            setWarningLevel(part);
+        }
+        return list;
+    }
+
+    private void setWarningLevel(SmallPart part) {
+        WarningLevel level = stockThresholdConfigService.calculateWarningLevel(
+                part.getPartType(), part.getStockQuantity());
+        part.setWarningLevel(level.getCode());
     }
 
     public void refreshCache() {
@@ -347,6 +364,12 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
             lengthSet.add(spec.getLength());
         }
 
+        for (PinMatrixVO.PinMatrixCell cell : cellMap.values()) {
+            WarningLevel level = stockThresholdConfigService.calculateWarningLevel(
+                    "顶针", cell.getQuantity());
+            cell.setWarningLevel(level.getCode());
+        }
+
         List<String> diameters = new ArrayList<>(diameterSet);
         diameters.sort((a, b) -> Double.compare(toDouble(a), toDouble(b)));
         List<String> lengths = new ArrayList<>(lengthSet);
@@ -404,6 +427,12 @@ public class SmallPartService extends ServiceImpl<SmallPartMapper, SmallPart> {
             cell.setPartModel(appendDistinct(cell.getPartModel(), part.getPartModel()));
             thicknessSet.add(spec.getThickness());
             outerDiameterSet.add(spec.getOuterDiameter());
+        }
+
+        for (ShimMatrixVO.ShimMatrixCell cell : cellMap.values()) {
+            WarningLevel level = stockThresholdConfigService.calculateWarningLevel(
+                    "限位垫片", cell.getQuantity());
+            cell.setWarningLevel(level.getCode());
         }
 
         List<String> thicknesses = new ArrayList<>(thicknessSet);

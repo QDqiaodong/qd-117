@@ -35,8 +35,9 @@
           clearable
           style="width: 170px;"
         >
-          <el-option label="紧缺 (≤10)" value="low" />
-          <el-option label="有库存 (>0)" value="has" />
+          <el-option label="紧缺" value="danger" />
+          <el-option label="偏低" value="warning" />
+          <el-option label="有库存" value="has" />
         </el-select>
         <el-tooltip content="规格来自入库时的规格参数(直径/长度/材质)" placement="top">
           <el-icon class="hint-icon"><InfoFilled /></el-icon>
@@ -102,9 +103,9 @@
     </div>
 
     <div class="legend">
-      <span class="lg ok">充足 (&gt;50)</span>
-      <span class="lg warn">偏少 (11-50)</span>
-      <span class="lg danger">紧缺 (≤10)</span>
+      <span class="lg ok">充足</span>
+      <span class="lg warn">偏低</span>
+      <span class="lg danger">紧缺</span>
       <span class="lg zero">无库存</span>
       <span v-if="matrix.skipped > 0" class="lg skip">
         {{ matrix.skipped }} 个型号未填写完整规格(直径/长度)，已隐藏
@@ -163,7 +164,8 @@ const passFilter = (c) => {
       (c.shelfNo || '').toLowerCase().includes(kw)
     if (!hit) return false
   }
-  if (stockFilter.value === 'low' && !(c.quantity <= 10)) return false
+  if (stockFilter.value === 'danger' && c.warningLevel !== 'danger') return false
+  if (stockFilter.value === 'warning' && c.warningLevel !== 'warning') return false
   if (stockFilter.value === 'has' && !(c.quantity > 0)) return false
   return true
 }
@@ -209,8 +211,8 @@ const materialStat = (m) => {
 const cellClass = (c) => {
   if (!c) return 'c-empty'
   if (c.quantity <= 0) return 'c-zero'
-  if (c.quantity <= 10) return 'c-danger'
-  if (c.quantity <= 50) return 'c-warn'
+  if (c.warningLevel === 'danger') return 'c-danger'
+  if (c.warningLevel === 'warning') return 'c-warn'
   return 'c-ok'
 }
 

@@ -31,5 +31,7 @@ public class ShimMatrixVO {
         private String shelfNo;
 
         private String partModel;
+
+        private String warningLevel;
     }
 }
